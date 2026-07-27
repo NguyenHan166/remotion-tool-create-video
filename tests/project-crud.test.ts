@@ -3,24 +3,31 @@ import {
   AssetNotFoundError,
   ProjectNotFoundError,
   ProjectVersionConflictError,
+  computeProjectContentHash,
   type CreateProjectRecordInput,
   type ListProjectRecordsInput,
   type Project,
   type ProjectRecordPage,
   type ProjectRepository,
+  type ProjectRevisionRecord,
   type UpdateProjectDraftInput,
 } from '../packages/database/src/index.js';
 import {
   createProjectCollectionHandlers,
+  createProjectDuplicateHandlers,
   createProjectResourceHandlers,
+  createProjectRevisionHandlers,
 } from '../apps/web/src/projects/handlers.js';
 import { DefaultProjectService } from '../apps/web/src/projects/service.js';
+import { migrateProjectDocument } from '../packages/project-schema/src/index.js';
 
 const projectId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+const duplicateProjectId = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
 const sceneId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 
 class InMemoryProjectRepository implements ProjectRepository {
   readonly #projects = new Map<string, Project>();
+  readonly #revisions = new Map<string, ProjectRevisionRecord[]>();
   #clock = 0;
 
   async create(input: CreateProjectRecordInput): Promise<Project> {
@@ -109,6 +116,63 @@ class InMemoryProjectRepository implements ProjectRepository {
     return structuredClone(archivedProject);
   }
 
+  async duplicate(id: string): Promise<Project> {
+    const source = this.#projects.get(id);
+
+    if (source === undefined) {
+      throw new ProjectNotFoundError(id);
+    }
+
+    const timestamp = this.#nextTimestamp();
+    const suffix = ' (Copy)';
+    const duplicate: Project = {
+      ...structuredClone(source),
+      id: duplicateProjectId,
+      name: `${source.name.slice(0, 200 - suffix.length)}${suffix}`,
+      status: 'DRAFT',
+      draftVersion: 1,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    };
+    this.#projects.set(duplicate.id, duplicate);
+
+    return structuredClone(duplicate);
+  }
+
+  async createRevision(id: string): Promise<ProjectRevisionRecord> {
+    const project = this.#projects.get(id);
+
+    if (project === undefined) {
+      throw new ProjectNotFoundError(id);
+    }
+
+    const document = migrateProjectDocument(project.draftDocument);
+    const revisions = this.#revisions.get(id) ?? [];
+    const revision: ProjectRevisionRecord = {
+      id: `eeeeeeee-eeee-4eee-8eee-${String(revisions.length + 1).padStart(12, '0')}`,
+      projectId: id,
+      revisionNumber: revisions.length + 1,
+      schemaVersion: document.schemaVersion,
+      templateId: document.template.id,
+      templateVersion: document.template.version,
+      contentHash: computeProjectContentHash(document),
+      document: structuredClone(document),
+      createdAt: this.#nextTimestamp(),
+    };
+    revisions.push(revision);
+    this.#revisions.set(id, revisions);
+
+    return structuredClone(revision);
+  }
+
+  async listRevisions(id: string): Promise<ProjectRevisionRecord[]> {
+    if (!this.#projects.has(id)) {
+      throw new ProjectNotFoundError(id);
+    }
+
+    return structuredClone([...(this.#revisions.get(id) ?? [])].reverse());
+  }
+
   #nextTimestamp(): Date {
     this.#clock += 1;
 
@@ -138,7 +202,9 @@ function createTestHandlers(repository: ProjectRepository = new InMemoryProjectR
 
   return {
     collection: createProjectCollectionHandlers(service),
+    duplicate: createProjectDuplicateHandlers(service),
     resource: createProjectResourceHandlers(service),
+    revisions: createProjectRevisionHandlers(service),
   };
 }
 
@@ -396,6 +462,83 @@ describe('project CRUD API', () => {
         ],
         requestId: 'request-1',
       },
+    });
+  });
+
+  it('duplicates a draft and creates immutable revisions in newest-first order', async () => {
+    const handlers = createTestHandlers();
+    const createResponse = await handlers.collection.POST(
+      createJsonRequest('POST', 'http://localhost/api/v1/projects', {
+        name: 'Revision source',
+        description: 'Source description',
+        templateId: 'warning-dark-v1',
+        width: 1080,
+        height: 1920,
+        fps: 30,
+      }),
+    );
+    const source = (await createResponse.json()) as {
+      document: Record<string, unknown>;
+    };
+    const context = { params: { projectId } };
+    const duplicateResponse = await handlers.duplicate.POST(
+      new Request(`http://localhost/api/v1/projects/${projectId}/duplicate`, {
+        method: 'POST',
+      }),
+      context,
+    );
+    const firstRevisionResponse = await handlers.revisions.POST(
+      new Request(`http://localhost/api/v1/projects/${projectId}/revisions`, {
+        method: 'POST',
+      }),
+      context,
+    );
+    const secondRevisionResponse = await handlers.revisions.POST(
+      new Request(`http://localhost/api/v1/projects/${projectId}/revisions`, {
+        method: 'POST',
+      }),
+      context,
+    );
+    const listResponse = await handlers.revisions.GET(
+      new Request(`http://localhost/api/v1/projects/${projectId}/revisions`),
+      context,
+    );
+    const expectedContentHash = computeProjectContentHash(source.document);
+
+    expect(duplicateResponse.status).toBe(201);
+    await expect(duplicateResponse.json()).resolves.toMatchObject({
+      id: duplicateProjectId,
+      name: 'Revision source (Copy)',
+      description: 'Source description',
+      status: 'DRAFT',
+      draftVersion: 1,
+      document: source.document,
+    });
+    expect(firstRevisionResponse.status).toBe(201);
+    await expect(firstRevisionResponse.json()).resolves.toMatchObject({
+      projectId,
+      revisionNumber: 1,
+      schemaVersion: 1,
+      templateId: 'warning-dark-v1',
+      templateVersion: 1,
+      contentHash: expectedContentHash,
+    });
+    expect(secondRevisionResponse.status).toBe(201);
+    await expect(secondRevisionResponse.json()).resolves.toMatchObject({
+      projectId,
+      revisionNumber: 2,
+      contentHash: expectedContentHash,
+    });
+    expect(listResponse.status).toBe(200);
+    await expect(listResponse.json()).resolves.toMatchObject({
+      items: [
+        {
+          revisionNumber: 2,
+        },
+        {
+          revisionNumber: 1,
+        },
+      ],
     });
   });
 });

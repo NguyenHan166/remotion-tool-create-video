@@ -25,6 +25,13 @@ integrationTest('Prisma project repository integration', () => {
     const projectIds = createdProjectIds.splice(0);
 
     if (projectIds.length > 0) {
+      await database.projectRevision.deleteMany({
+        where: {
+          projectId: {
+            in: projectIds,
+          },
+        },
+      });
       await database.project.deleteMany({
         where: {
           id: {
@@ -237,5 +244,127 @@ integrationTest('Prisma project repository integration', () => {
         },
       }),
     ).resolves.toEqual([{ assetId: secondAssetId }]);
+  });
+
+  it('duplicates references and creates concurrent immutable revisions with unique numbers', async () => {
+    const repository = new PrismaProjectRepository(database);
+    const assetId = randomUUID();
+    createdAssetIds.push(assetId);
+
+    await database.asset.create({
+      data: {
+        id: assetId,
+        kind: 'LOGO',
+        status: 'READY',
+        originalName: 'logo.png',
+        storedName: `${assetId}.png`,
+        relativePath: `assets/${assetId}.png`,
+        mimeType: 'image/png',
+        sizeBytes: 1n,
+        sha256: 'c'.repeat(64),
+      },
+    });
+
+    const document = parseProjectDocument({
+      schemaVersion: 1,
+      metadata: {
+        title: 'Revision test',
+      },
+      template: {
+        id: 'warning-dark-v1',
+      },
+      theme: {
+        logoAssetId: assetId,
+      },
+      scenes: [
+        {
+          id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+          type: 'hook',
+          name: 'Opening',
+        },
+      ],
+    });
+    const source = await repository.create({
+      name: 'Revision test',
+      description: 'Source project',
+      draftDocument: document,
+      assetIds: [assetId],
+    });
+    createdProjectIds.push(source.id);
+
+    const duplicate = await repository.duplicate(source.id);
+    createdProjectIds.push(duplicate.id);
+
+    expect(duplicate).toMatchObject({
+      name: 'Revision test (Copy)',
+      description: 'Source project',
+      status: 'DRAFT',
+      draftVersion: 1,
+      draftDocument: document,
+    });
+    await expect(
+      database.projectAsset.findMany({
+        where: {
+          projectId: duplicate.id,
+        },
+        select: {
+          assetId: true,
+        },
+      }),
+    ).resolves.toEqual([{ assetId }]);
+
+    const createdRevisions = await Promise.all([
+      repository.createRevision(source.id),
+      repository.createRevision(source.id),
+    ]);
+    const revisionsByNumber = [...createdRevisions].sort(
+      (left, right) => left.revisionNumber - right.revisionNumber,
+    );
+
+    expect(revisionsByNumber.map((revision) => revision.revisionNumber)).toEqual([1, 2]);
+    expect(revisionsByNumber[0]?.contentHash).toMatch(/^[a-f0-9]{64}$/);
+    expect(revisionsByNumber[1]?.contentHash).toBe(revisionsByNumber[0]?.contentHash);
+    await expect(repository.listRevisions(source.id)).resolves.toMatchObject([
+      {
+        revisionNumber: 2,
+      },
+      {
+        revisionNumber: 1,
+      },
+    ]);
+
+    const documentWithoutAsset = structuredClone(document);
+    delete documentWithoutAsset.theme.logoAssetId;
+    await repository.updateDraft({
+      projectId: source.id,
+      expectedDraftVersion: 1,
+      draftDocument: documentWithoutAsset,
+      assetIds: [],
+    });
+
+    await expect(
+      database.projectAsset.count({
+        where: {
+          projectId: source.id,
+        },
+      }),
+    ).resolves.toBe(0);
+    await expect(
+      database.revisionAsset.findMany({
+        where: {
+          revision: {
+            projectId: source.id,
+          },
+        },
+        orderBy: {
+          revision: {
+            revisionNumber: 'asc',
+          },
+        },
+        select: {
+          assetId: true,
+        },
+      }),
+    ).resolves.toEqual([{ assetId }, { assetId }]);
   });
 });

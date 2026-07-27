@@ -74,6 +74,9 @@ importers:
 
   packages/database:
     dependencies:
+      '@hansys/project-schema':
+        specifier: workspace:*
+        version: link:../project-schema
       '@prisma/adapter-pg':
         specifier: 7.9.0
         version: 7.9.0

@@ -1,7 +1,13 @@
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../generated/prisma/client.js';
 
-export { Prisma, PrismaClient, type Project } from '../generated/prisma/client.js';
+export {
+  Prisma,
+  PrismaClient,
+  type Project,
+  type ProjectRevision,
+} from '../generated/prisma/client.js';
+export { computeProjectContentHash } from './project-content-hash.js';
 export {
   AssetNotFoundError,
   PrismaProjectRepository,
@@ -11,6 +17,7 @@ export {
   type ListProjectRecordsInput,
   type ProjectRecordPage,
   type ProjectRepository,
+  type ProjectRevisionRecord,
   type ProjectAssetSynchronizationClient,
   type ProjectStatusValue,
   type ProjectSummaryRecord,

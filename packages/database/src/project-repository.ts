@@ -1,4 +1,11 @@
-import type { Prisma, PrismaClient, Project } from '../generated/prisma/client.js';
+import { extractProjectAssetIds, migrateProjectDocument } from '@hansys/project-schema';
+import {
+  Prisma,
+  type PrismaClient,
+  type Project,
+  type ProjectRevision,
+} from '../generated/prisma/client.js';
+import { computeProjectContentHash } from './project-content-hash.js';
 
 export type ProjectStatusValue = 'DRAFT' | 'ARCHIVED';
 
@@ -37,7 +44,12 @@ export interface ProjectRepository {
   findById(projectId: string): Promise<Project | null>;
   updateDraft(input: UpdateProjectDraftInput): Promise<Project>;
   archive(projectId: string): Promise<Project>;
+  duplicate(projectId: string): Promise<Project>;
+  createRevision(projectId: string): Promise<ProjectRevisionRecord>;
+  listRevisions(projectId: string): Promise<ProjectRevisionRecord[]>;
 }
+
+export type ProjectRevisionRecord = ProjectRevision;
 
 export class ProjectNotFoundError extends Error {
   readonly code = 'PROJECT_NOT_FOUND';
@@ -146,6 +158,30 @@ async function replaceProjectAssetReferences(
       skipDuplicates: true,
     });
   }
+}
+
+async function lockProject(
+  transaction: Prisma.TransactionClient,
+  projectId: string,
+): Promise<void> {
+  const lockedProjects = await transaction.$queryRaw<Array<{ id: string }>>(
+    Prisma.sql`
+      SELECT "id"
+      FROM "Project"
+      WHERE "id" = ${projectId}::uuid
+      FOR UPDATE
+    `,
+  );
+
+  if (lockedProjects.length === 0) {
+    throw new ProjectNotFoundError(projectId);
+  }
+}
+
+function createDuplicateProjectName(name: string): string {
+  const suffix = ' (Copy)';
+
+  return `${name.slice(0, 200 - suffix.length)}${suffix}`;
 }
 
 function serializeJson(value: unknown): Prisma.InputJsonValue {
@@ -341,6 +377,114 @@ export class PrismaProjectRepository implements ProjectRepository {
           id: projectId,
         },
       });
+    });
+  }
+
+  async duplicate(projectId: string): Promise<Project> {
+    return this.#database.$transaction(async (transaction) => {
+      await lockProject(transaction, projectId);
+
+      const source = await transaction.project.findUniqueOrThrow({
+        where: {
+          id: projectId,
+        },
+        include: {
+          assets: {
+            select: {
+              assetId: true,
+            },
+          },
+        },
+      });
+      const duplicate = await transaction.project.create({
+        data: {
+          name: createDuplicateProjectName(source.name),
+          description: source.description,
+          draftDocument: serializeJson(source.draftDocument),
+        },
+      });
+
+      if (source.assets.length > 0) {
+        await transaction.projectAsset.createMany({
+          data: source.assets.map(({ assetId }) => ({
+            projectId: duplicate.id,
+            assetId,
+          })),
+        });
+      }
+
+      return duplicate;
+    });
+  }
+
+  async createRevision(projectId: string): Promise<ProjectRevisionRecord> {
+    return this.#database.$transaction(async (transaction) => {
+      await lockProject(transaction, projectId);
+
+      const project = await transaction.project.findUniqueOrThrow({
+        where: {
+          id: projectId,
+        },
+      });
+      const document = migrateProjectDocument(project.draftDocument);
+      const assetIds = await verifyProjectAssets(transaction, extractProjectAssetIds(document));
+      const latestRevision = await transaction.projectRevision.findFirst({
+        where: {
+          projectId,
+        },
+        orderBy: {
+          revisionNumber: 'desc',
+        },
+        select: {
+          revisionNumber: true,
+        },
+      });
+      const revision = await transaction.projectRevision.create({
+        data: {
+          projectId,
+          revisionNumber: (latestRevision?.revisionNumber ?? 0) + 1,
+          schemaVersion: document.schemaVersion,
+          templateId: document.template.id,
+          templateVersion: document.template.version,
+          contentHash: computeProjectContentHash(document),
+          document: serializeJson(document),
+        },
+      });
+
+      if (assetIds.length > 0) {
+        await transaction.revisionAsset.createMany({
+          data: assetIds.map((assetId) => ({
+            revisionId: revision.id,
+            assetId,
+          })),
+        });
+      }
+
+      return revision;
+    });
+  }
+
+  async listRevisions(projectId: string): Promise<ProjectRevisionRecord[]> {
+    const project = await this.#database.project.findUnique({
+      where: {
+        id: projectId,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (project === null) {
+      throw new ProjectNotFoundError(projectId);
+    }
+
+    return this.#database.projectRevision.findMany({
+      where: {
+        projectId,
+      },
+      orderBy: {
+        revisionNumber: 'desc',
+      },
     });
   }
 }

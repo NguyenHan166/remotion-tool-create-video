@@ -329,3 +329,63 @@ export function createProjectResourceHandlers(service: ProjectService): {
     },
   };
 }
+
+export function createProjectDuplicateHandlers(service: ProjectService): {
+  POST: (request: Request, context: ProjectRouteContext) => Promise<Response>;
+} {
+  return {
+    POST: async (request, context) => {
+      const projectIdResult = await parseProjectId(request, context);
+
+      if (!projectIdResult.success) {
+        return projectIdResult.response;
+      }
+
+      try {
+        return Response.json(await service.duplicate(projectIdResult.projectId), {
+          status: 201,
+        });
+      } catch (error) {
+        return handleProjectError(request, error);
+      }
+    },
+  };
+}
+
+export function createProjectRevisionHandlers(service: ProjectService): {
+  GET: (request: Request, context: ProjectRouteContext) => Promise<Response>;
+  POST: (request: Request, context: ProjectRouteContext) => Promise<Response>;
+} {
+  return {
+    GET: async (request, context) => {
+      const projectIdResult = await parseProjectId(request, context);
+
+      if (!projectIdResult.success) {
+        return projectIdResult.response;
+      }
+
+      try {
+        return Response.json({
+          items: await service.listRevisions(projectIdResult.projectId),
+        });
+      } catch (error) {
+        return handleProjectError(request, error);
+      }
+    },
+    POST: async (request, context) => {
+      const projectIdResult = await parseProjectId(request, context);
+
+      if (!projectIdResult.success) {
+        return projectIdResult.response;
+      }
+
+      try {
+        return Response.json(await service.createRevision(projectIdResult.projectId), {
+          status: 201,
+        });
+      } catch (error) {
+        return handleProjectError(request, error);
+      }
+    },
+  };
+}

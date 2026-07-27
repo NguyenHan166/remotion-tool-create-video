@@ -3,6 +3,7 @@ import {
   ProjectNotFoundError,
   type Project,
   type ProjectRepository,
+  type ProjectRevisionRecord,
   type ProjectStatusValue,
 } from '@hansys/database';
 import {
@@ -43,12 +44,26 @@ export type ProjectPageResponse = {
   total: number;
 };
 
+export type ProjectRevisionResponse = {
+  id: string;
+  projectId: string;
+  revisionNumber: number;
+  schemaVersion: number;
+  templateId: string;
+  templateVersion: number;
+  contentHash: string;
+  createdAt: string;
+};
+
 export interface ProjectService {
   create(input: CreateProjectRequest): Promise<ProjectResponse>;
   list(input: ListProjectsQuery): Promise<ProjectPageResponse>;
   get(projectId: string): Promise<ProjectResponse>;
   update(projectId: string, input: UpdateProjectRequest): Promise<ProjectResponse>;
   archive(projectId: string): Promise<void>;
+  duplicate(projectId: string): Promise<ProjectResponse>;
+  createRevision(projectId: string): Promise<ProjectRevisionResponse>;
+  listRevisions(projectId: string): Promise<ProjectRevisionResponse[]>;
 }
 
 function toProjectResponse(project: Project): ProjectResponse {
@@ -90,6 +105,19 @@ function createDefaultDocument(
       },
     ],
   });
+}
+
+function toProjectRevisionResponse(revision: ProjectRevisionRecord): ProjectRevisionResponse {
+  return {
+    id: revision.id,
+    projectId: revision.projectId,
+    revisionNumber: revision.revisionNumber,
+    schemaVersion: revision.schemaVersion,
+    templateId: revision.templateId,
+    templateVersion: revision.templateVersion,
+    contentHash: revision.contentHash,
+    createdAt: revision.createdAt.toISOString(),
+  };
 }
 
 export class DefaultProjectService implements ProjectService {
@@ -159,5 +187,19 @@ export class DefaultProjectService implements ProjectService {
 
   async archive(projectId: string): Promise<void> {
     await this.#repository.archive(projectId);
+  }
+
+  async duplicate(projectId: string): Promise<ProjectResponse> {
+    return toProjectResponse(await this.#repository.duplicate(projectId));
+  }
+
+  async createRevision(projectId: string): Promise<ProjectRevisionResponse> {
+    return toProjectRevisionResponse(await this.#repository.createRevision(projectId));
+  }
+
+  async listRevisions(projectId: string): Promise<ProjectRevisionResponse[]> {
+    const revisions = await this.#repository.listRevisions(projectId);
+
+    return revisions.map(toProjectRevisionResponse);
   }
 }
