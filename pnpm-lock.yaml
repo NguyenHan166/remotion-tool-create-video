@@ -38,6 +38,9 @@ importers:
       '@hansys/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      '@hansys/storage':
+        specifier: workspace:*
+        version: link:../../packages/storage
       '@remotion/player':
         specifier: 4.0.499
         version: 4.0.499(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -47,6 +50,9 @@ importers:
       '@hansys/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      '@hansys/storage':
+        specifier: workspace:*
+        version: link:../../packages/storage
       '@remotion/bundler':
         specifier: 4.0.499
         version: 4.0.499(postcss@8.5.23)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)

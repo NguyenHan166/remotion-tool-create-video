@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@hansys/shared": "workspace:*",
+    "@hansys/storage": "workspace:*",
     "@remotion/player": "4.0.499"
   }
 }
