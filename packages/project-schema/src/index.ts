@@ -1,4 +1,14 @@
 import { z, type ZodError, type ZodIssue } from 'zod';
+import { createProjectDocumentMigrator, type ProjectMigration } from './migration.js';
+
+export {
+  InvalidProjectDocumentVersionError,
+  ProjectDocumentMigrationError,
+  UnsupportedProjectDocumentVersionError,
+  createProjectDocumentMigrator,
+  type ProjectDocumentMigratorOptions,
+  type ProjectMigration,
+} from './migration.js';
 
 export const CURRENT_PROJECT_SCHEMA_VERSION = 1 as const;
 export const MAX_PROJECT_DURATION_SECONDS = 180;
@@ -412,6 +422,18 @@ export function parseProjectDocument(input: unknown): ProjectDocumentV1 {
   }
 
   return result.data;
+}
+
+export const PROJECT_DOCUMENT_MIGRATIONS: readonly ProjectMigration[] = Object.freeze([]);
+
+const migrateToCurrentProjectDocument = createProjectDocumentMigrator({
+  currentVersion: CURRENT_PROJECT_SCHEMA_VERSION,
+  migrations: PROJECT_DOCUMENT_MIGRATIONS,
+  parseCurrentDocument: parseProjectDocument,
+});
+
+export function migrateProjectDocument(input: unknown): ProjectDocumentV1 {
+  return migrateToCurrentProjectDocument(input);
 }
 
 export type ProjectDocumentJsonSchema = Record<string, unknown>;
