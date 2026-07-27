@@ -6,5 +6,9 @@
   "scripts": {
     "lint": "eslint src --max-warnings=0",
     "typecheck": "tsc --project tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@remotion/bundler": "4.0.499",
+    "@remotion/renderer": "4.0.499"
   }
 }

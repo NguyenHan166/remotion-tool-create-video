@@ -9,9 +9,10 @@
     "node": ">=22"
   },
   "scripts": {
+    "check:remotion-versions": "node scripts/check-remotion-versions.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "lint": "turbo run lint && eslint tests eslint.config.mjs prettier.config.mjs --max-warnings=0",
+    "lint": "turbo run lint && eslint scripts tests eslint.config.mjs prettier.config.mjs --max-warnings=0",
     "test": "vitest run",
     "typecheck": "turbo run typecheck && tsc --project tsconfig.json --noEmit"
   },

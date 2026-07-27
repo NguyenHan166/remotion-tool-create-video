@@ -6,5 +6,8 @@
   "scripts": {
     "lint": "eslint src --max-warnings=0",
     "typecheck": "tsc --project tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@remotion/player": "4.0.499"
   }
 }
