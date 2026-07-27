@@ -38,6 +38,9 @@ importers:
       '@hansys/database':
         specifier: workspace:*
         version: link:../../packages/database
+      '@hansys/project-schema':
+        specifier: workspace:*
+        version: link:../../packages/project-schema
       '@hansys/shared':
         specifier: workspace:*
         version: link:../../packages/shared
@@ -47,6 +50,9 @@ importers:
       '@remotion/player':
         specifier: 4.0.499
         version: 4.0.499(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
 
   apps/worker:
     dependencies:

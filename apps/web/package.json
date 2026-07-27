@@ -9,8 +9,10 @@
   },
   "dependencies": {
     "@hansys/database": "workspace:*",
+    "@hansys/project-schema": "workspace:*",
     "@hansys/shared": "workspace:*",
     "@hansys/storage": "workspace:*",
-    "@remotion/player": "4.0.499"
+    "@remotion/player": "4.0.499",
+    "zod": "^4.4.3"
   }
 }
