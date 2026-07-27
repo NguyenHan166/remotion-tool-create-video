@@ -12,6 +12,16 @@ export {
 
 export const CURRENT_PROJECT_SCHEMA_VERSION = 1 as const;
 export const MAX_PROJECT_DURATION_SECONDS = 180;
+export const PROJECT_SCENE_TYPES = [
+  'hook',
+  'headline',
+  'content',
+  'image',
+  'video',
+  'bullet-list',
+  'quote',
+  'outro',
+] as const;
 
 const DEFAULT_COMPOSITION = {
   width: 1080,
@@ -94,16 +104,7 @@ export const MediaV1Schema = z.strictObject({
 export const SceneV1Schema = z
   .strictObject({
     id: z.uuid('Must be a UUID'),
-    type: z.enum([
-      'hook',
-      'headline',
-      'content',
-      'image',
-      'video',
-      'bullet-list',
-      'quote',
-      'outro',
-    ]),
+    type: z.enum(PROJECT_SCENE_TYPES),
     name: nonBlankString(200),
     enabled: z.boolean().default(PROJECT_DOCUMENT_DEFAULTS.scene.enabled),
     durationInFrames: z.int().min(6).default(PROJECT_DOCUMENT_DEFAULTS.scene.durationInFrames),
@@ -434,6 +435,14 @@ export function extractProjectAssetIds(project: ProjectDocumentV1): string[] {
 
   return [...new Set(assetIds.filter((assetId): assetId is string => assetId !== undefined))];
 }
+
+export {
+  splitScriptIntoSceneDrafts,
+  type ScriptSceneDraft,
+  type ScriptSplitInput,
+  type ScriptSplitMode,
+  type ScriptSplitPreview,
+} from './script-splitting.js';
 
 export const PROJECT_DOCUMENT_MIGRATIONS: readonly ProjectMigration[] = Object.freeze([]);
 

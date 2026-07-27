@@ -11,11 +11,15 @@ import {
   extractProjectAssetIds,
   migrateProjectDocument,
   parseProjectDocument,
+  splitScriptIntoSceneDrafts,
   type ProjectDocumentV1,
+  type ScriptSplitPreview,
 } from '@hansys/project-schema';
 import {
   type CreateProjectRequest,
   type ListProjectsQuery,
+  type ScriptApplyRequest,
+  type ScriptPreviewRequest,
   type UpdateProjectRequest,
 } from './contracts.js';
 
@@ -64,6 +68,8 @@ export interface ProjectService {
   duplicate(projectId: string): Promise<ProjectResponse>;
   createRevision(projectId: string): Promise<ProjectRevisionResponse>;
   listRevisions(projectId: string): Promise<ProjectRevisionResponse[]>;
+  previewScript(projectId: string, input: ScriptPreviewRequest): Promise<ScriptSplitPreview>;
+  applyScript(projectId: string, input: ScriptApplyRequest): Promise<ProjectResponse>;
 }
 
 function toProjectResponse(project: Project): ProjectResponse {
@@ -201,5 +207,43 @@ export class DefaultProjectService implements ProjectService {
     const revisions = await this.#repository.listRevisions(projectId);
 
     return revisions.map(toProjectRevisionResponse);
+  }
+
+  async previewScript(projectId: string, input: ScriptPreviewRequest): Promise<ScriptSplitPreview> {
+    if ((await this.#repository.findById(projectId)) === null) {
+      throw new ProjectNotFoundError(projectId);
+    }
+
+    return splitScriptIntoSceneDrafts(input);
+  }
+
+  async applyScript(projectId: string, input: ScriptApplyRequest): Promise<ProjectResponse> {
+    const project = await this.#repository.findById(projectId);
+
+    if (project === null) {
+      throw new ProjectNotFoundError(projectId);
+    }
+
+    const currentDocument = migrateProjectDocument(project.draftDocument);
+    const document = parseProjectDocument({
+      ...currentDocument,
+      scenes: input.scenes.map((scene) => ({
+        id: this.#createId(),
+        type: scene.type,
+        name: scene.name,
+        durationInFrames: scene.durationInFrames,
+        text: {
+          body: scene.body,
+        },
+      })),
+    });
+    const updatedProject = await this.#repository.updateDraft({
+      projectId,
+      expectedDraftVersion: input.expectedDraftVersion,
+      draftDocument: document,
+      assetIds: extractProjectAssetIds(document),
+    });
+
+    return toProjectResponse(updatedProject);
   }
 }

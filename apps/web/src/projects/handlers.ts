@@ -15,6 +15,8 @@ import {
   createProjectRequestSchema,
   listProjectsQuerySchema,
   projectIdSchema,
+  scriptApplyRequestSchema,
+  scriptPreviewRequestSchema,
   updateProjectRequestSchema,
 } from './contracts.js';
 import { type ProjectService } from './service.js';
@@ -383,6 +385,84 @@ export function createProjectRevisionHandlers(service: ProjectService): {
         return Response.json(await service.createRevision(projectIdResult.projectId), {
           status: 201,
         });
+      } catch (error) {
+        return handleProjectError(request, error);
+      }
+    },
+  };
+}
+
+export function createProjectScriptPreviewHandlers(service: ProjectService): {
+  POST: (request: Request, context: ProjectRouteContext) => Promise<Response>;
+} {
+  return {
+    POST: async (request, context) => {
+      const projectIdResult = await parseProjectId(request, context);
+
+      if (!projectIdResult.success) {
+        return projectIdResult.response;
+      }
+
+      const jsonResult = await readJsonRequest(request);
+
+      if (!jsonResult.success) {
+        return jsonResult.response;
+      }
+
+      const requestResult = scriptPreviewRequestSchema.safeParse(jsonResult.data);
+
+      if (!requestResult.success) {
+        return createErrorResponse(request, {
+          status: 400,
+          code: 'BAD_REQUEST',
+          message: 'Script preview request is invalid.',
+          details: formatZodIssues(requestResult.error),
+        });
+      }
+
+      try {
+        return Response.json(
+          await service.previewScript(projectIdResult.projectId, requestResult.data),
+        );
+      } catch (error) {
+        return handleProjectError(request, error);
+      }
+    },
+  };
+}
+
+export function createProjectScriptApplyHandlers(service: ProjectService): {
+  POST: (request: Request, context: ProjectRouteContext) => Promise<Response>;
+} {
+  return {
+    POST: async (request, context) => {
+      const projectIdResult = await parseProjectId(request, context);
+
+      if (!projectIdResult.success) {
+        return projectIdResult.response;
+      }
+
+      const jsonResult = await readJsonRequest(request);
+
+      if (!jsonResult.success) {
+        return jsonResult.response;
+      }
+
+      const requestResult = scriptApplyRequestSchema.safeParse(jsonResult.data);
+
+      if (!requestResult.success) {
+        return createErrorResponse(request, {
+          status: 400,
+          code: 'BAD_REQUEST',
+          message: 'Script apply request is invalid.',
+          details: formatZodIssues(requestResult.error),
+        });
+      }
+
+      try {
+        return Response.json(
+          await service.applyScript(projectIdResult.projectId, requestResult.data),
+        );
       } catch (error) {
         return handleProjectError(request, error);
       }

@@ -173,9 +173,41 @@ Creates a new project with copied draft document and ProjectAsset references.
 
 Returns deterministic scene drafts. Does not persist.
 
+Request:
+
+```json
+{
+  "rawText": "Đoạn một\n\nĐoạn hai",
+  "splitMode": "blank-line",
+  "defaultSceneType": "content",
+  "defaultDurationInFrames": 150
+}
+```
+
+`splitMode` is `blank-line`, `delimiter` or `single`. A non-blank `delimiter` is required
+for delimiter mode.
+
 ### POST `/projects/{projectId}/script-apply`
 
 Applies a previously reviewed set of scene drafts using optimistic concurrency.
+
+Request:
+
+```json
+{
+  "expectedDraftVersion": 12,
+  "scenes": [
+    {
+      "name": "Scene 1",
+      "body": "Nội dung đã duyệt",
+      "type": "content",
+      "durationInFrames": 150
+    }
+  ]
+}
+```
+
+Applying replaces the current scene list, assigns new scene IDs and returns the updated project.
 
 ### POST `/projects/{projectId}/revisions`
 

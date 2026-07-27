@@ -17,6 +17,8 @@ import {
   createProjectDuplicateHandlers,
   createProjectResourceHandlers,
   createProjectRevisionHandlers,
+  createProjectScriptApplyHandlers,
+  createProjectScriptPreviewHandlers,
 } from '../apps/web/src/projects/handlers.js';
 import { DefaultProjectService } from '../apps/web/src/projects/service.js';
 import { migrateProjectDocument } from '../packages/project-schema/src/index.js';
@@ -24,6 +26,10 @@ import { migrateProjectDocument } from '../packages/project-schema/src/index.js'
 const projectId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const duplicateProjectId = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
 const sceneId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+const appliedSceneIdOne = '11111111-1111-4111-8111-111111111111';
+const appliedSceneIdTwo = '22222222-2222-4222-8222-222222222222';
+const appliedSceneIdThree = '33333333-3333-4333-8333-333333333333';
+const appliedSceneIdFour = '44444444-4444-4444-8444-444444444444';
 
 class InMemoryProjectRepository implements ProjectRepository {
   readonly #projects = new Map<string, Project>();
@@ -198,13 +204,33 @@ function createJsonRequest(method: string, url: string, body?: unknown): Request
 }
 
 function createTestHandlers(repository: ProjectRepository = new InMemoryProjectRepository()) {
-  const service = new DefaultProjectService(repository, () => sceneId);
+  const generatedIds = [
+    sceneId,
+    appliedSceneIdOne,
+    appliedSceneIdTwo,
+    appliedSceneIdThree,
+    appliedSceneIdFour,
+  ];
+  let generatedIdIndex = 0;
+  const service = new DefaultProjectService(repository, () => {
+    const generatedId = generatedIds[generatedIdIndex];
+
+    if (generatedId === undefined) {
+      throw new Error('Test scene ID sequence exhausted');
+    }
+
+    generatedIdIndex += 1;
+
+    return generatedId;
+  });
 
   return {
     collection: createProjectCollectionHandlers(service),
     duplicate: createProjectDuplicateHandlers(service),
     resource: createProjectResourceHandlers(service),
     revisions: createProjectRevisionHandlers(service),
+    scriptApply: createProjectScriptApplyHandlers(service),
+    scriptPreview: createProjectScriptPreviewHandlers(service),
   };
 }
 
@@ -539,6 +565,132 @@ describe('project CRUD API', () => {
           revisionNumber: 1,
         },
       ],
+    });
+  });
+
+  it('previews Vietnamese paragraphs without persisting and applies reviewed scenes', async () => {
+    const handlers = createTestHandlers();
+    await handlers.collection.POST(
+      createJsonRequest('POST', 'http://localhost/api/v1/projects', {
+        name: 'Vietnamese script',
+        templateId: 'warning-dark-v1',
+        width: 1080,
+        height: 1920,
+        fps: 30,
+      }),
+    );
+    const context = { params: { projectId } };
+    const previewResponse = await handlers.scriptPreview.POST(
+      createJsonRequest('POST', `http://localhost/api/v1/projects/${projectId}/script-preview`, {
+        rawText:
+          'Cảnh báo: không cung cấp mã OTP cho bất kỳ ai.\r\n\r\nHãy kiểm tra kỹ đường dẫn trước khi đăng nhập.',
+        splitMode: 'blank-line',
+        defaultSceneType: 'content',
+        defaultDurationInFrames: 90,
+      }),
+      context,
+    );
+    const preview = (await previewResponse.json()) as {
+      scenes: Array<{
+        name: string;
+        body: string;
+        type: string;
+        durationInFrames: number;
+      }>;
+      warnings: string[];
+    };
+    const beforeApplyResponse = await handlers.resource.GET(
+      new Request(`http://localhost/api/v1/projects/${projectId}`),
+      context,
+    );
+
+    expect(previewResponse.status).toBe(200);
+    expect(preview).toEqual({
+      scenes: [
+        {
+          name: 'Scene 1',
+          body: 'Cảnh báo: không cung cấp mã OTP cho bất kỳ ai.',
+          type: 'content',
+          durationInFrames: 90,
+        },
+        {
+          name: 'Scene 2',
+          body: 'Hãy kiểm tra kỹ đường dẫn trước khi đăng nhập.',
+          type: 'content',
+          durationInFrames: 90,
+        },
+      ],
+      warnings: [],
+    });
+    await expect(beforeApplyResponse.json()).resolves.toMatchObject({
+      draftVersion: 1,
+      document: {
+        scenes: [
+          {
+            id: sceneId,
+          },
+        ],
+      },
+    });
+
+    const applyBody = {
+      expectedDraftVersion: 1,
+      scenes: [
+        {
+          ...preview.scenes[0]!,
+          name: 'Mở đầu cảnh báo',
+        },
+        preview.scenes[1]!,
+      ],
+    };
+    const applyResponse = await handlers.scriptApply.POST(
+      createJsonRequest(
+        'POST',
+        `http://localhost/api/v1/projects/${projectId}/script-apply`,
+        applyBody,
+      ),
+      context,
+    );
+    const staleApplyResponse = await handlers.scriptApply.POST(
+      createJsonRequest(
+        'POST',
+        `http://localhost/api/v1/projects/${projectId}/script-apply`,
+        applyBody,
+      ),
+      context,
+    );
+
+    expect(applyResponse.status).toBe(200);
+    await expect(applyResponse.json()).resolves.toMatchObject({
+      draftVersion: 2,
+      document: {
+        scenes: [
+          {
+            id: appliedSceneIdOne,
+            name: 'Mở đầu cảnh báo',
+            type: 'content',
+            durationInFrames: 90,
+            text: {
+              body: 'Cảnh báo: không cung cấp mã OTP cho bất kỳ ai.',
+            },
+          },
+          {
+            id: appliedSceneIdTwo,
+            name: 'Scene 2',
+            type: 'content',
+            durationInFrames: 90,
+            text: {
+              body: 'Hãy kiểm tra kỹ đường dẫn trước khi đăng nhập.',
+            },
+          },
+        ],
+      },
+    });
+    expect(staleApplyResponse.status).toBe(409);
+    await expect(staleApplyResponse.json()).resolves.toMatchObject({
+      error: {
+        code: 'PROJECT_VERSION_CONFLICT',
+      },
     });
   });
 });
