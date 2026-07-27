@@ -35,6 +35,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@hansys/database':
+        specifier: workspace:*
+        version: link:../../packages/database
       '@hansys/shared':
         specifier: workspace:*
         version: link:../../packages/shared
@@ -47,6 +50,9 @@ importers:
 
   apps/worker:
     dependencies:
+      '@hansys/database':
+        specifier: workspace:*
+        version: link:../../packages/database
       '@hansys/shared':
         specifier: workspace:*
         version: link:../../packages/shared

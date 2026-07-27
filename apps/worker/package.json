@@ -8,6 +8,7 @@
     "typecheck": "tsc --project tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@hansys/database": "workspace:*",
     "@hansys/shared": "workspace:*",
     "@hansys/storage": "workspace:*",
     "@remotion/bundler": "4.0.499",

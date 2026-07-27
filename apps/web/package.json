@@ -4,10 +4,11 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "lint": "eslint src --max-warnings=0",
+    "lint": "eslint src app --max-warnings=0",
     "typecheck": "tsc --project tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@hansys/database": "workspace:*",
     "@hansys/shared": "workspace:*",
     "@hansys/storage": "workspace:*",
     "@remotion/player": "4.0.499"

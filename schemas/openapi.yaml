@@ -30,7 +30,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorEnvelope"
+                $ref: "#/components/schemas/Health"
 
   /templates:
     get:
@@ -518,13 +518,47 @@ components:
   schemas:
     Health:
       type: object
-      required: [status, appVersion, database, storage, worker]
+      required: [status, appVersion, database, storage, worker, workerDetails, checkedAt]
       properties:
         status: {type: string, enum: [ok, degraded]}
         appVersion: {type: string}
         database: {type: string, enum: [ok, error]}
         storage: {type: string, enum: [ok, error]}
         worker: {type: string, enum: [online, offline, unknown]}
+        workerDetails:
+          oneOf:
+            - $ref: "#/components/schemas/WorkerHealthDetails"
+            - type: "null"
+        checkedAt: {type: string, format: date-time}
+
+    WorkerHealthDetails:
+      type: object
+      required:
+        [
+          workerId,
+          appVersion,
+          remotionVersion,
+          status,
+          currentJobId,
+          ffmpegAvailable,
+          browserAvailable,
+          storageWritable,
+          startedAt,
+          lastSeenAt,
+        ]
+      properties:
+        workerId: {type: string}
+        appVersion: {type: string}
+        remotionVersion: {type: string}
+        status: {type: string, enum: [IDLE, BUSY, STOPPING, UNHEALTHY]}
+        currentJobId:
+          type: [string, "null"]
+          format: uuid
+        ffmpegAvailable: {type: boolean}
+        browserAvailable: {type: boolean}
+        storageWritable: {type: boolean}
+        startedAt: {type: string, format: date-time}
+        lastSeenAt: {type: string, format: date-time}
 
     Template:
       type: object
