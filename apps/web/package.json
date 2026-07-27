@@ -8,6 +8,7 @@
     "typecheck": "tsc --project tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@hansys/shared": "workspace:*",
     "@remotion/player": "4.0.499"
   }
 }

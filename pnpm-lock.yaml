@@ -35,12 +35,18 @@ importers:
 
   apps/web:
     dependencies:
+      '@hansys/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       '@remotion/player':
         specifier: 4.0.499
         version: 4.0.499(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
 
   apps/worker:
     dependencies:
+      '@hansys/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       '@remotion/bundler':
         specifier: 4.0.499
         version: 4.0.499(postcss@8.5.23)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -52,7 +58,11 @@ importers:
 
   packages/project-schema: {}
 
-  packages/shared: {}
+  packages/shared:
+    dependencies:
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
 
   packages/storage: {}
 

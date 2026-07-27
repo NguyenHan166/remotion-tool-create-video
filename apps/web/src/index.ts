@@ -1,2 +1,1 @@
-// The Next.js application is initialized in a later commit.
-export {};
+export { clientEnvironment, webServerEnvironment } from './environment.js';

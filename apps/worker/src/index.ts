@@ -1,2 +1,1 @@
-// The render worker is initialized in a later commit.
-export {};
+export { workerServerEnvironment } from './environment.js';

@@ -8,6 +8,7 @@
     "typecheck": "tsc --project tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@hansys/shared": "workspace:*",
     "@remotion/bundler": "4.0.499",
     "@remotion/renderer": "4.0.499"
   }
