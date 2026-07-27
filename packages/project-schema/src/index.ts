@@ -424,6 +424,17 @@ export function parseProjectDocument(input: unknown): ProjectDocumentV1 {
   return result.data;
 }
 
+export function extractProjectAssetIds(project: ProjectDocumentV1): string[] {
+  const assetIds = [
+    project.theme.logoAssetId,
+    ...project.scenes.map((scene) => scene.media?.assetId),
+    project.audio.voiceover?.assetId,
+    project.audio.backgroundMusic?.assetId,
+  ];
+
+  return [...new Set(assetIds.filter((assetId): assetId is string => assetId !== undefined))];
+}
+
 export const PROJECT_DOCUMENT_MIGRATIONS: readonly ProjectMigration[] = Object.freeze([]);
 
 const migrateToCurrentProjectDocument = createProjectDocumentMigrator({

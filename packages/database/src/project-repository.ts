@@ -6,6 +6,7 @@ export type CreateProjectRecordInput = {
   name: string;
   description: string | null;
   draftDocument: unknown;
+  assetIds: readonly string[];
 };
 
 export type ListProjectRecordsInput = {
@@ -27,6 +28,7 @@ export type UpdateProjectDraftInput = {
   expectedDraftVersion: number;
   name?: string;
   draftDocument: unknown;
+  assetIds: readonly string[];
 };
 
 export interface ProjectRepository {
@@ -65,6 +67,87 @@ export class ProjectVersionConflictError extends Error {
   }
 }
 
+export class AssetNotFoundError extends Error {
+  readonly code = 'ASSET_NOT_FOUND';
+  readonly assetIds: readonly string[];
+
+  constructor(assetIds: readonly string[]) {
+    super(`Referenced assets were not found: ${assetIds.join(', ')}`);
+    this.name = 'AssetNotFoundError';
+    this.assetIds = assetIds;
+  }
+}
+
+export type ProjectAssetSynchronizationClient = {
+  asset: {
+    findMany: (args: Prisma.AssetFindManyArgs) => Promise<Array<{ id: string }>>;
+  };
+  projectAsset: {
+    deleteMany: (args: Prisma.ProjectAssetDeleteManyArgs) => Promise<unknown>;
+    createMany: (args: Prisma.ProjectAssetCreateManyArgs) => Promise<unknown>;
+  };
+};
+
+async function verifyProjectAssets(
+  transaction: ProjectAssetSynchronizationClient,
+  assetIds: readonly string[],
+): Promise<string[]> {
+  const uniqueAssetIds = [...new Set(assetIds)];
+  const existingAssets =
+    uniqueAssetIds.length === 0
+      ? []
+      : await transaction.asset.findMany({
+          where: {
+            id: {
+              in: uniqueAssetIds,
+            },
+            status: {
+              not: 'DELETED',
+            },
+          },
+          select: {
+            id: true,
+          },
+        });
+  const existingAssetIds = new Set(existingAssets.map((asset) => asset.id));
+  const missingAssetIds = uniqueAssetIds.filter((assetId) => !existingAssetIds.has(assetId));
+
+  if (missingAssetIds.length > 0) {
+    throw new AssetNotFoundError(missingAssetIds);
+  }
+
+  return uniqueAssetIds;
+}
+
+async function replaceProjectAssetReferences(
+  transaction: ProjectAssetSynchronizationClient,
+  projectId: string,
+  assetIds: readonly string[],
+): Promise<void> {
+  await transaction.projectAsset.deleteMany({
+    where: {
+      projectId,
+      ...(assetIds.length === 0
+        ? {}
+        : {
+            assetId: {
+              notIn: [...assetIds],
+            },
+          }),
+    },
+  });
+
+  if (assetIds.length > 0) {
+    await transaction.projectAsset.createMany({
+      data: assetIds.map((assetId) => ({
+        projectId,
+        assetId,
+      })),
+      skipDuplicates: true,
+    });
+  }
+}
+
 function serializeJson(value: unknown): Prisma.InputJsonValue {
   const serialized = JSON.stringify(value);
 
@@ -75,6 +158,16 @@ function serializeJson(value: unknown): Prisma.InputJsonValue {
   return JSON.parse(serialized) as Prisma.InputJsonValue;
 }
 
+export async function synchronizeProjectAssetReferences(
+  transaction: ProjectAssetSynchronizationClient,
+  projectId: string,
+  assetIds: readonly string[],
+): Promise<void> {
+  const verifiedAssetIds = await verifyProjectAssets(transaction, assetIds);
+
+  await replaceProjectAssetReferences(transaction, projectId, verifiedAssetIds);
+}
+
 export class PrismaProjectRepository implements ProjectRepository {
   readonly #database: PrismaClient;
 
@@ -82,13 +175,25 @@ export class PrismaProjectRepository implements ProjectRepository {
     this.#database = database;
   }
 
-  async create({ name, description, draftDocument }: CreateProjectRecordInput): Promise<Project> {
-    return this.#database.project.create({
-      data: {
-        name,
-        description,
-        draftDocument: serializeJson(draftDocument),
-      },
+  async create({
+    name,
+    description,
+    draftDocument,
+    assetIds,
+  }: CreateProjectRecordInput): Promise<Project> {
+    return this.#database.$transaction(async (transaction) => {
+      const verifiedAssetIds = await verifyProjectAssets(transaction, assetIds);
+      const project = await transaction.project.create({
+        data: {
+          name,
+          description,
+          draftDocument: serializeJson(draftDocument),
+        },
+      });
+
+      await replaceProjectAssetReferences(transaction, project.id, verifiedAssetIds);
+
+      return project;
     });
   }
 
@@ -156,8 +261,10 @@ export class PrismaProjectRepository implements ProjectRepository {
     expectedDraftVersion,
     name,
     draftDocument,
+    assetIds,
   }: UpdateProjectDraftInput): Promise<Project> {
     return this.#database.$transaction(async (transaction) => {
+      const verifiedAssetIds = await verifyProjectAssets(transaction, assetIds);
       const updateResult = await transaction.project.updateMany({
         where: {
           id: projectId,
@@ -192,6 +299,8 @@ export class PrismaProjectRepository implements ProjectRepository {
           currentProject.draftVersion,
         );
       }
+
+      await replaceProjectAssetReferences(transaction, projectId, verifiedAssetIds);
 
       return transaction.project.findUniqueOrThrow({
         where: {

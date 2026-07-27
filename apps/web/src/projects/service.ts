@@ -7,6 +7,7 @@ import {
 } from '@hansys/database';
 import {
   CURRENT_PROJECT_SCHEMA_VERSION,
+  extractProjectAssetIds,
   migrateProjectDocument,
   parseProjectDocument,
   type ProjectDocumentV1,
@@ -106,6 +107,7 @@ export class DefaultProjectService implements ProjectService {
       name: input.name,
       description: input.description ?? null,
       draftDocument: document,
+      assetIds: extractProjectAssetIds(document),
     });
 
     return toProjectResponse(project);
@@ -149,6 +151,7 @@ export class DefaultProjectService implements ProjectService {
       expectedDraftVersion: input.expectedDraftVersion,
       ...(input.name === undefined ? {} : { name: input.name }),
       draftDocument: document,
+      assetIds: extractProjectAssetIds(document),
     });
 
     return toProjectResponse(project);

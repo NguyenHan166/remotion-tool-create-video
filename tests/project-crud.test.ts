@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  AssetNotFoundError,
   ProjectNotFoundError,
   ProjectVersionConflictError,
   type CreateProjectRecordInput,
@@ -115,6 +116,12 @@ class InMemoryProjectRepository implements ProjectRepository {
   }
 }
 
+class MissingAssetProjectRepository extends InMemoryProjectRepository {
+  override async updateDraft(input: UpdateProjectDraftInput): Promise<Project> {
+    throw new AssetNotFoundError(input.assetIds);
+  }
+}
+
 function createJsonRequest(method: string, url: string, body?: unknown): Request {
   return new Request(url, {
     method,
@@ -126,8 +133,8 @@ function createJsonRequest(method: string, url: string, body?: unknown): Request
   });
 }
 
-function createTestHandlers() {
-  const service = new DefaultProjectService(new InMemoryProjectRepository(), () => sceneId);
+function createTestHandlers(repository: ProjectRepository = new InMemoryProjectRepository()) {
+  const service = new DefaultProjectService(repository, () => sceneId);
 
   return {
     collection: createProjectCollectionHandlers(service),
@@ -343,6 +350,51 @@ describe('project CRUD API', () => {
     await expect(response.json()).resolves.toMatchObject({
       error: {
         code: 'PROJECT_NOT_FOUND',
+      },
+    });
+  });
+
+  it('returns ASSET_NOT_FOUND when a draft references a missing asset', async () => {
+    const handlers = createTestHandlers(new MissingAssetProjectRepository());
+    const missingAssetId = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+    const response = await handlers.resource.PATCH(
+      createJsonRequest('PATCH', `http://localhost/api/v1/projects/${projectId}`, {
+        expectedDraftVersion: 1,
+        document: {
+          schemaVersion: 1,
+          metadata: {
+            title: 'Missing asset',
+          },
+          template: {
+            id: 'warning-dark-v1',
+          },
+          theme: {
+            logoAssetId: missingAssetId,
+          },
+          scenes: [
+            {
+              id: sceneId,
+              type: 'hook',
+              name: 'Opening',
+            },
+          ],
+        },
+      }),
+      { params: { projectId } },
+    );
+
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toEqual({
+      error: {
+        code: 'ASSET_NOT_FOUND',
+        message: 'One or more referenced assets were not found.',
+        details: [
+          {
+            path: 'document',
+            message: `Referenced asset not found: ${missingAssetId}`,
+          },
+        ],
+        requestId: 'request-1',
       },
     });
   });

@@ -3,6 +3,7 @@ import { PrismaClient } from '../generated/prisma/client.js';
 
 export { Prisma, PrismaClient, type Project } from '../generated/prisma/client.js';
 export {
+  AssetNotFoundError,
   PrismaProjectRepository,
   ProjectNotFoundError,
   ProjectVersionConflictError,
@@ -10,9 +11,11 @@ export {
   type ListProjectRecordsInput,
   type ProjectRecordPage,
   type ProjectRepository,
+  type ProjectAssetSynchronizationClient,
   type ProjectStatusValue,
   type ProjectSummaryRecord,
   type UpdateProjectDraftInput,
+  synchronizeProjectAssetReferences,
 } from './project-repository.js';
 
 export function createPrismaClient(databaseUrl: string): PrismaClient {

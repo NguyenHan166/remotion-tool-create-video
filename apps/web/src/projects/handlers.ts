@@ -1,5 +1,9 @@
 import { randomUUID } from 'node:crypto';
-import { ProjectNotFoundError, ProjectVersionConflictError } from '@hansys/database';
+import {
+  AssetNotFoundError,
+  ProjectNotFoundError,
+  ProjectVersionConflictError,
+} from '@hansys/database';
 import {
   InvalidProjectDocumentVersionError,
   ProjectDocumentMigrationError,
@@ -67,6 +71,18 @@ function createErrorResponse(request: Request, options: ErrorResponseOptions): R
 }
 
 function handleProjectError(request: Request, error: unknown): Response {
+  if (error instanceof AssetNotFoundError) {
+    return createErrorResponse(request, {
+      status: 404,
+      code: error.code,
+      message: 'One or more referenced assets were not found.',
+      details: error.assetIds.map((assetId) => ({
+        path: 'document',
+        message: `Referenced asset not found: ${assetId}`,
+      })),
+    });
+  }
+
   if (error instanceof ProjectNotFoundError) {
     return createErrorResponse(request, {
       status: 404,
