@@ -1,0 +1,113 @@
+{
+  "schemaVersion": 1,
+  "metadata": {
+    "title": "Cảnh báo lừa đảo trực tuyến",
+    "description": "Project mẫu cho video dọc 15 giây"
+  },
+  "composition": {
+    "width": 1080,
+    "height": 1920,
+    "fps": 30,
+    "backgroundColor": "#090B10"
+  },
+  "template": {
+    "id": "warning-dark-v1",
+    "version": 1
+  },
+  "theme": {
+    "primaryColor": "#D71920",
+    "secondaryColor": "#151922",
+    "accentColor": "#F7C948",
+    "textColor": "#FFFFFF",
+    "mutedTextColor": "#C6CBD4",
+    "fontFamily": "BeVietnamPro",
+    "watermarkText": "HanSYS"
+  },
+  "scenes": [
+    {
+      "id": "11111111-1111-4111-8111-111111111111",
+      "type": "hook",
+      "name": "Mở đầu",
+      "enabled": true,
+      "durationInFrames": 90,
+      "transition": {
+        "type": "fade",
+        "durationInFrames": 10
+      },
+      "text": {
+        "label": "CẢNH BÁO",
+        "headline": "Đừng chuyển tiền khi chưa kiểm tra",
+        "body": "Một phút xác minh có thể giúp bạn tránh mất tiền."
+      },
+      "style": {
+        "variant": "urgent",
+        "textAlign": "center",
+        "emphasis": "urgent"
+      }
+    },
+    {
+      "id": "22222222-2222-4222-8222-222222222222",
+      "type": "bullet-list",
+      "name": "Dấu hiệu",
+      "enabled": true,
+      "durationInFrames": 240,
+      "transition": {
+        "type": "slide-up",
+        "durationInFrames": 12
+      },
+      "text": {
+        "headline": "Ba dấu hiệu cần dừng lại",
+        "bullets": [
+          "Thúc giục chuyển tiền ngay",
+          "Yêu cầu giữ bí mật",
+          "Gửi đường link đăng nhập lạ"
+        ],
+        "source": "Nguồn: nội dung do người dùng cung cấp"
+      },
+      "style": {
+        "variant": "warning-list",
+        "textAlign": "left",
+        "emphasis": "strong"
+      }
+    },
+    {
+      "id": "33333333-3333-4333-8333-333333333333",
+      "type": "outro",
+      "name": "Kết",
+      "enabled": true,
+      "durationInFrames": 120,
+      "transition": {
+        "type": "fade",
+        "durationInFrames": 10
+      },
+      "text": {
+        "headline": "Kiểm tra trước, an toàn sau",
+        "body": "Chia sẻ để người thân cùng cảnh giác."
+      },
+      "style": {
+        "variant": "call-to-action",
+        "textAlign": "center",
+        "emphasis": "strong"
+      }
+    }
+  ],
+  "audio": {},
+  "captions": {
+    "enabled": false,
+    "source": "none",
+    "style": "tiktok",
+    "entries": [],
+    "options": {
+      "maxWordsPerPage": 6,
+      "highlightCurrentWord": false,
+      "position": "bottom",
+      "fontSize": 58
+    }
+  },
+  "export": {
+    "preset": "vertical-h264",
+    "codec": "h264",
+    "muted": false,
+    "fileName": "canh-bao-lua-dao.mp4"
+  }
+}

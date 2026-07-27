@@ -1,0 +1,77 @@
+name: hansys-video-studio
+
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-hansys_video}
+      POSTGRES_USER: ${POSTGRES_USER:-hansys}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-hansys} -d ${POSTGRES_DB:-hansys_video}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  migrate:
+    image: ${APP_IMAGE}:${APP_VERSION}
+    command: ["pnpm", "--filter", "@hansys/database", "prisma:migrate:deploy"]
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-hansys}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-hansys_video}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  web:
+    image: ${APP_IMAGE}:${APP_VERSION}
+    command: ["pnpm", "--filter", "@hansys/web", "start"]
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      APP_VERSION: ${APP_VERSION}
+      APP_PORT: 3000
+      APP_URL: ${APP_URL:-http://localhost:3000}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-hansys}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-hansys_video}
+      DATA_DIR: /data
+      MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-1024}
+      AUTO_SAVE_DELAY_MS: ${AUTO_SAVE_DELAY_MS:-800}
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    volumes:
+      - video_data:/data
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://localhost:3000/api/v1/health').then(r=>{if(!r.ok)process.exit(1)})\""]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  worker:
+    image: ${APP_IMAGE}:${APP_VERSION}
+    command: ["pnpm", "--filter", "@hansys/worker", "start"]
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      APP_VERSION: ${APP_VERSION}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-hansys}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-hansys_video}
+      DATA_DIR: /data
+      RENDER_JOB_CONCURRENCY: ${RENDER_JOB_CONCURRENCY:-1}
+      RENDER_FRAME_CONCURRENCY: ${RENDER_FRAME_CONCURRENCY:-50%}
+      RENDER_JOB_POLL_MS: ${RENDER_JOB_POLL_MS:-1000}
+      RENDER_STALE_AFTER_MINUTES: ${RENDER_STALE_AFTER_MINUTES:-30}
+      RENDER_MAX_ATTEMPTS: ${RENDER_MAX_ATTEMPTS:-2}
+    volumes:
+      - video_data:/data
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+volumes:
+  postgres_data:
+  video_data:

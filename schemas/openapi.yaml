@@ -1,0 +1,742 @@
+openapi: 3.1.0
+info:
+  title: HanSYS Video Studio API
+  version: 0.1.0
+  description: Local-first API for project editing, asset storage and Remotion rendering.
+servers:
+  - url: /api/v1
+tags:
+  - name: Health
+  - name: Templates
+  - name: Projects
+  - name: Assets
+  - name: Captions
+  - name: Renders
+  - name: Settings
+paths:
+  /health:
+    get:
+      tags: [Health]
+      operationId: getHealth
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
+        "503":
+          description: Core dependency unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /templates:
+    get:
+      tags: [Templates]
+      operationId: listTemplates
+      responses:
+        "200":
+          description: Template registry
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Template"
+
+  /templates/{templateId}:
+    parameters:
+      - $ref: "#/components/parameters/TemplateId"
+    get:
+      tags: [Templates]
+      operationId: getTemplate
+      responses:
+        "200":
+          description: Template manifest
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Template"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /projects:
+    get:
+      tags: [Projects]
+      operationId: listProjects
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+        - name: search
+          in: query
+          schema: {type: string}
+        - name: status
+          in: query
+          schema: {type: string, enum: [DRAFT, ARCHIVED]}
+      responses:
+        "200":
+          description: Project page
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectPage"
+    post:
+      tags: [Projects]
+      operationId: createProject
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProjectRequest"
+      responses:
+        "201":
+          description: Created project
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+
+  /projects/{projectId}:
+    parameters:
+      - $ref: "#/components/parameters/ProjectId"
+    get:
+      tags: [Projects]
+      operationId: getProject
+      responses:
+        "200":
+          description: Project
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      tags: [Projects]
+      operationId: updateProject
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProjectRequest"
+      responses:
+        "200":
+          description: Updated project
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+        "409":
+          description: Draft version conflict
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+    delete:
+      tags: [Projects]
+      operationId: archiveProject
+      responses:
+        "204":
+          description: Archived
+
+  /projects/{projectId}/duplicate:
+    parameters:
+      - $ref: "#/components/parameters/ProjectId"
+    post:
+      tags: [Projects]
+      operationId: duplicateProject
+      responses:
+        "201":
+          description: Duplicated project
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+
+  /projects/{projectId}/script-preview:
+    parameters:
+      - $ref: "#/components/parameters/ProjectId"
+    post:
+      tags: [Projects]
+      operationId: previewScriptSplit
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ScriptImportRequest"
+      responses:
+        "200":
+          description: Scene preview
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScriptImportPreview"
+
+  /projects/{projectId}/revisions:
+    parameters:
+      - $ref: "#/components/parameters/ProjectId"
+    get:
+      tags: [Projects]
+      operationId: listProjectRevisions
+      responses:
+        "200":
+          description: Revisions
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ProjectRevision"
+    post:
+      tags: [Projects]
+      operationId: createProjectRevision
+      responses:
+        "201":
+          description: Revision
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectRevision"
+
+  /assets:
+    get:
+      tags: [Assets]
+      operationId: listAssets
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+        - name: projectId
+          in: query
+          schema: {type: string, format: uuid}
+        - name: kind
+          in: query
+          schema:
+            type: string
+            enum: [IMAGE, VIDEO, AUDIO, FONT, LOGO, SUBTITLE]
+      responses:
+        "200":
+          description: Asset page
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssetPage"
+    post:
+      tags: [Assets]
+      operationId: uploadAsset
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                projectId:
+                  type: string
+                  format: uuid
+      responses:
+        "201":
+          description: Uploaded asset
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Asset"
+
+  /assets/{assetId}:
+    parameters:
+      - $ref: "#/components/parameters/AssetId"
+    get:
+      tags: [Assets]
+      operationId: getAsset
+      responses:
+        "200":
+          description: Asset
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Asset"
+    delete:
+      tags: [Assets]
+      operationId: deleteAsset
+      responses:
+        "204":
+          description: Deleted
+        "409":
+          description: Asset in use
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /assets/{assetId}/file:
+    parameters:
+      - $ref: "#/components/parameters/AssetId"
+    get:
+      tags: [Assets]
+      operationId: streamAsset
+      responses:
+        "200":
+          description: Full media
+          content:
+            application/octet-stream: {}
+        "206":
+          description: Partial media
+          content:
+            application/octet-stream: {}
+
+  /projects/{projectId}/captions/import-srt:
+    parameters:
+      - $ref: "#/components/parameters/ProjectId"
+    post:
+      tags: [Captions]
+      operationId: importSrt
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, expectedDraftVersion]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                expectedDraftVersion:
+                  type: integer
+                  minimum: 1
+      responses:
+        "200":
+          description: Updated project
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+
+  /renders:
+    get:
+      tags: [Renders]
+      operationId: listRenders
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+        - name: projectId
+          in: query
+          schema: {type: string, format: uuid}
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/RenderStatus"
+      responses:
+        "200":
+          description: Render page
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RenderPage"
+    post:
+      tags: [Renders]
+      operationId: createRender
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: false
+          schema: {type: string, maxLength: 200}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [projectId, preset]
+              properties:
+                projectId:
+                  type: string
+                  format: uuid
+                preset:
+                  type: string
+                  enum: [draft, vertical-h264, vertical-high]
+      responses:
+        "202":
+          description: Queued render
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RenderJob"
+
+  /renders/{renderId}:
+    parameters:
+      - $ref: "#/components/parameters/RenderId"
+    get:
+      tags: [Renders]
+      operationId: getRender
+      responses:
+        "200":
+          description: Render job
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RenderJob"
+
+  /renders/{renderId}/cancel:
+    parameters:
+      - $ref: "#/components/parameters/RenderId"
+    post:
+      tags: [Renders]
+      operationId: cancelRender
+      responses:
+        "202":
+          description: Cancellation requested
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RenderJob"
+
+  /renders/{renderId}/retry:
+    parameters:
+      - $ref: "#/components/parameters/RenderId"
+    post:
+      tags: [Renders]
+      operationId: retryRender
+      responses:
+        "202":
+          description: Requeued render
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RenderJob"
+
+  /renders/{renderId}/download:
+    parameters:
+      - $ref: "#/components/parameters/RenderId"
+    get:
+      tags: [Renders]
+      operationId: downloadRender
+      responses:
+        "200":
+          description: Video output
+          content:
+            video/mp4: {}
+
+  /renders/{renderId}/thumbnail:
+    parameters:
+      - $ref: "#/components/parameters/RenderId"
+    get:
+      tags: [Renders]
+      operationId: getRenderThumbnail
+      responses:
+        "200":
+          description: Thumbnail
+          content:
+            image/png: {}
+
+  /settings:
+    get:
+      tags: [Settings]
+      operationId: getSettings
+      responses:
+        "200":
+          description: Settings
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+    patch:
+      tags: [Settings]
+      operationId: updateSettings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Updated settings
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+components:
+  parameters:
+    Page:
+      name: page
+      in: query
+      schema: {type: integer, minimum: 1, default: 1}
+    PageSize:
+      name: pageSize
+      in: query
+      schema: {type: integer, minimum: 1, maximum: 100, default: 20}
+    ProjectId:
+      name: projectId
+      in: path
+      required: true
+      schema: {type: string, format: uuid}
+    AssetId:
+      name: assetId
+      in: path
+      required: true
+      schema: {type: string, format: uuid}
+    RenderId:
+      name: renderId
+      in: path
+      required: true
+      schema: {type: string, format: uuid}
+    TemplateId:
+      name: templateId
+      in: path
+      required: true
+      schema: {type: string, maxLength: 100}
+
+  responses:
+    NotFound:
+      description: Not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+
+  schemas:
+    Health:
+      type: object
+      required: [status, appVersion, database, storage, worker]
+      properties:
+        status: {type: string, enum: [ok, degraded]}
+        appVersion: {type: string}
+        database: {type: string, enum: [ok, error]}
+        storage: {type: string, enum: [ok, error]}
+        worker: {type: string, enum: [online, offline, unknown]}
+
+    Template:
+      type: object
+      required: [id, version, name, supportedAspectRatios, supportedSceneTypes]
+      properties:
+        id: {type: string}
+        version: {type: integer}
+        name: {type: string}
+        description: {type: string}
+        thumbnailUrl: {type: string}
+        supportedAspectRatios:
+          type: array
+          items: {type: string, enum: ["9:16", "16:9", "1:1"]}
+        supportedSceneTypes:
+          type: array
+          items: {type: string}
+
+    CreateProjectRequest:
+      type: object
+      additionalProperties: false
+      required: [name, templateId, width, height, fps]
+      properties:
+        name: {type: string, minLength: 1, maxLength: 200}
+        description: {type: string, maxLength: 5000}
+        templateId: {type: string}
+        width: {type: integer, minimum: 320, maximum: 3840}
+        height: {type: integer, minimum: 320, maximum: 3840}
+        fps: {type: integer, enum: [24, 25, 30, 50, 60]}
+
+    UpdateProjectRequest:
+      type: object
+      additionalProperties: false
+      required: [expectedDraftVersion, document]
+      properties:
+        expectedDraftVersion: {type: integer, minimum: 1}
+        name: {type: string, minLength: 1, maxLength: 200}
+        document:
+          type: object
+          additionalProperties: true
+
+    Project:
+      type: object
+      required: [id, name, status, draftVersion, document, createdAt, updatedAt]
+      properties:
+        id: {type: string, format: uuid}
+        name: {type: string}
+        description: {type: [string, "null"]}
+        status: {type: string, enum: [DRAFT, ARCHIVED]}
+        draftVersion: {type: integer}
+        document:
+          type: object
+          additionalProperties: true
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
+
+    ProjectSummary:
+      type: object
+      required: [id, name, status, updatedAt]
+      properties:
+        id: {type: string, format: uuid}
+        name: {type: string}
+        status: {type: string}
+        updatedAt: {type: string, format: date-time}
+
+    ProjectPage:
+      type: object
+      required: [items, page, pageSize, total]
+      properties:
+        items:
+          type: array
+          items: {$ref: "#/components/schemas/ProjectSummary"}
+        page: {type: integer}
+        pageSize: {type: integer}
+        total: {type: integer}
+
+    ProjectRevision:
+      type: object
+      required: [id, projectId, revisionNumber, schemaVersion, templateId, templateVersion, contentHash, createdAt]
+      properties:
+        id: {type: string, format: uuid}
+        projectId: {type: string, format: uuid}
+        revisionNumber: {type: integer}
+        schemaVersion: {type: integer}
+        templateId: {type: string}
+        templateVersion: {type: integer}
+        contentHash: {type: string}
+        createdAt: {type: string, format: date-time}
+
+    ScriptImportRequest:
+      type: object
+      additionalProperties: false
+      required: [rawText, splitMode, defaultSceneType, defaultDurationInFrames]
+      properties:
+        rawText: {type: string, minLength: 1, maxLength: 100000}
+        splitMode: {type: string, enum: [blank-line, delimiter, single]}
+        delimiter: {type: string, maxLength: 100}
+        defaultSceneType: {type: string}
+        defaultDurationInFrames: {type: integer, minimum: 6}
+
+    ScriptImportPreview:
+      type: object
+      required: [scenes, warnings]
+      properties:
+        scenes:
+          type: array
+          items:
+            type: object
+            required: [name, body, type, durationInFrames]
+            properties:
+              name: {type: string}
+              body: {type: string}
+              type: {type: string}
+              durationInFrames: {type: integer}
+        warnings:
+          type: array
+          items: {type: string}
+
+    Asset:
+      type: object
+      required: [id, kind, status, originalName, mimeType, sizeBytes, createdAt]
+      properties:
+        id: {type: string, format: uuid}
+        kind: {type: string, enum: [IMAGE, VIDEO, AUDIO, FONT, LOGO, SUBTITLE]}
+        status: {type: string, enum: [PROCESSING, READY, FAILED, DELETED]}
+        originalName: {type: string}
+        mimeType: {type: string}
+        sizeBytes: {type: integer}
+        width: {type: [integer, "null"]}
+        height: {type: [integer, "null"]}
+        durationMs: {type: [integer, "null"]}
+        hasAudio: {type: [boolean, "null"]}
+        createdAt: {type: string, format: date-time}
+
+    AssetPage:
+      type: object
+      required: [items, page, pageSize, total]
+      properties:
+        items:
+          type: array
+          items: {$ref: "#/components/schemas/Asset"}
+        page: {type: integer}
+        pageSize: {type: integer}
+        total: {type: integer}
+
+    RenderStatus:
+      type: string
+      enum: [QUEUED, PREPARING, BUNDLING, RENDERING, ENCODING, COMPLETED, FAILED, CANCEL_REQUESTED, CANCELLED]
+
+    RenderOutput:
+      type: object
+      required: [id, kind, fileName, mimeType, sizeBytes]
+      properties:
+        id: {type: string, format: uuid}
+        kind: {type: string, enum: [VIDEO, THUMBNAIL, LOG]}
+        fileName: {type: string}
+        mimeType: {type: string}
+        sizeBytes: {type: integer}
+        width: {type: [integer, "null"]}
+        height: {type: [integer, "null"]}
+        durationMs: {type: [integer, "null"]}
+
+    RenderJob:
+      type: object
+      required: [id, projectId, revisionId, status, progress, attempt, maxAttempts, createdAt, updatedAt, outputs]
+      properties:
+        id: {type: string, format: uuid}
+        projectId: {type: string, format: uuid}
+        revisionId: {type: string, format: uuid}
+        status: {$ref: "#/components/schemas/RenderStatus"}
+        progress: {type: number, minimum: 0, maximum: 1}
+        renderedFrames: {type: [integer, "null"]}
+        encodedFrames: {type: [integer, "null"]}
+        totalFrames: {type: [integer, "null"]}
+        stageMessage: {type: [string, "null"]}
+        attempt: {type: integer}
+        maxAttempts: {type: integer}
+        errorCode: {type: [string, "null"]}
+        errorMessage: {type: [string, "null"]}
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
+        outputs:
+          type: array
+          items: {$ref: "#/components/schemas/RenderOutput"}
+
+    RenderPage:
+      type: object
+      required: [items, page, pageSize, total]
+      properties:
+        items:
+          type: array
+          items: {$ref: "#/components/schemas/RenderJob"}
+        page: {type: integer}
+        pageSize: {type: integer}
+        total: {type: integer}
+
+    ErrorDetail:
+      type: object
+      properties:
+        path: {type: string}
+        message: {type: string}
+
+    ErrorEnvelope:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message, requestId]
+          properties:
+            code: {type: string}
+            message: {type: string}
+            details:
+              type: array
+              items: {$ref: "#/components/schemas/ErrorDetail"}
+            requestId: {type: string}

@@ -1,0 +1,97 @@
+[
+  {
+    "path": ".env.example",
+    "size": 420,
+    "sha256": "31aec24a2d123590f7b71631d10ff83f2a6375ed0096d10681bc6a6660a58edb"
+  },
+  {
+    "path": "README.md",
+    "size": 2688,
+    "sha256": "1e1eeeba4dc429b56d2e2a2dec94861b589d6e24d5145a0a5ba282a0e6ddb2f1"
+  },
+  {
+    "path": "docker/compose.example.yaml",
+    "size": 2536,
+    "sha256": "6bade956e58d24b9f5cf40e41cfeca73d206dd5a07b64a28106c390ef26e7dcc"
+  },
+  {
+    "path": "docs/01_PRODUCT_SPEC.md",
+    "size": 8174,
+    "sha256": "df7da25be5d5e7b748565657d8c9fe77eb2393005afc29498278a0f64129c5d0"
+  },
+  {
+    "path": "docs/02_TECHNICAL_ARCHITECTURE.md",
+    "size": 10782,
+    "sha256": "e704a7f5318f5d78a0012333562ed438cd23de81ef76d2d7e75e3aed47fa6283"
+  },
+  {
+    "path": "docs/03_PROJECT_DOCUMENT_SCHEMA.md",
+    "size": 6421,
+    "sha256": "843a12d3e6d57bbc2a7a288ac5d09dfd54fc17b0ba7d9509ddd0407bc88a8495"
+  },
+  {
+    "path": "docs/04_DATABASE_SCHEMA.md",
+    "size": 5864,
+    "sha256": "8f726ce4504ee55a32aea645923079a6ea3cb485a9d89f23d35c842854f2ecd4"
+  },
+  {
+    "path": "docs/05_API_CONTRACT.md",
+    "size": 5986,
+    "sha256": "ac2d7e1f5cdf18e3836b774a0aecb96a117e472426ce33bb999bc810163cf17c"
+  },
+  {
+    "path": "docs/06_RENDER_PIPELINE.md",
+    "size": 6669,
+    "sha256": "c073d5706b7deb4e10bc4d7240e6ef0c670851f7862ff23e21ee7811cebc033b"
+  },
+  {
+    "path": "docs/07_TEMPLATE_SDK.md",
+    "size": 4855,
+    "sha256": "50b539b61e1ce70cf0c6cc53bad3aa0a3bc2a3ad0b7f39d6cd0f709dea91d674"
+  },
+  {
+    "path": "docs/08_DOCKER_DEPLOYMENT.md",
+    "size": 2926,
+    "sha256": "492c8e6b18a70fefe400393bbcea26628841d65282431eec67d69da6758b99c9"
+  },
+  {
+    "path": "docs/09_TEST_STRATEGY.md",
+    "size": 2848,
+    "sha256": "0d4dfbd604e657131b98bbdf3bca26b01d1595864512f2f1af8a13eb214e09fb"
+  },
+  {
+    "path": "docs/10_TASKS_BY_COMMIT.md",
+    "size": 13017,
+    "sha256": "a21d33696736df1370f77f3855c4ebad7fd1f9d25af7cdce5f7ea7a2853e1b77"
+  },
+  {
+    "path": "docs/11_CODEX_BOOTSTRAP_PROMPT.md",
+    "size": 2715,
+    "sha256": "fc5baa133e98bf7d2a39f1f60267708d76cee4502f2496fc4e1fad6376f2d60f"
+  },
+  {
+    "path": "docs/12_REMOTION_REFERENCES.md",
+    "size": 1238,
+    "sha256": "56bc47bd493c380a453cbf3c7cc5bca39d56cf3bb962d537b475253d6cfec08d"
+  },
+  {
+    "path": "examples/project.example.json",
+    "size": 2794,
+    "sha256": "e0ff627b82e427560ad8c7c3411eee30a1835989005bf0417619fe5cf11ae642"
+  },
+  {
+    "path": "schemas/openapi.yaml",
+    "size": 20816,
+    "sha256": "2b75512468f5a28506a19a5820cf5d2f84e94f52dadabb242a290291f4a2c10e"
+  },
+  {
+    "path": "schemas/prisma/schema.prisma",
+    "size": 5871,
+    "sha256": "4a00c3b926b6e2fa7fee3ed2a84649de170d08e5a58f942a95408b1b24f37e56"
+  },
+  {
+    "path": "schemas/project.schema.json",
+    "size": 11560,
+    "sha256": "fc8f6006387a9337703b6c29edd6458b8ede9130abe478ae325c94d8398b3985"
+  }
+]

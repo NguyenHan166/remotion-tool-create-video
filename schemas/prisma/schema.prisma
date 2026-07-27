@@ -1,0 +1,230 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ProjectStatus {
+  DRAFT
+  ARCHIVED
+}
+
+enum AssetKind {
+  IMAGE
+  VIDEO
+  AUDIO
+  FONT
+  LOGO
+  SUBTITLE
+}
+
+enum AssetStatus {
+  PROCESSING
+  READY
+  FAILED
+  DELETED
+}
+
+enum RenderStatus {
+  QUEUED
+  PREPARING
+  BUNDLING
+  RENDERING
+  ENCODING
+  COMPLETED
+  FAILED
+  CANCEL_REQUESTED
+  CANCELLED
+}
+
+enum OutputKind {
+  VIDEO
+  THUMBNAIL
+  LOG
+}
+
+enum WorkerStatus {
+  IDLE
+  BUSY
+  STOPPING
+  UNHEALTHY
+}
+
+model Project {
+  id            String        @id @default(uuid()) @db.Uuid
+  name          String        @db.VarChar(200)
+  description   String?       @db.Text
+  status        ProjectStatus @default(DRAFT)
+  draftVersion  Int           @default(1)
+  draftDocument Json
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  revisions ProjectRevision[]
+  assets    ProjectAsset[]
+  renderJobs RenderJob[]
+
+  @@index([status, updatedAt(sort: Desc)])
+}
+
+model ProjectRevision {
+  id              String   @id @default(uuid()) @db.Uuid
+  projectId       String   @db.Uuid
+  revisionNumber  Int
+  schemaVersion   Int
+  templateId      String   @db.VarChar(100)
+  templateVersion Int
+  contentHash     String   @db.VarChar(64)
+  document        Json
+  createdAt       DateTime @default(now())
+
+  project    Project         @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  assets     RevisionAsset[]
+  renderJobs RenderJob[]
+
+  @@unique([projectId, revisionNumber])
+  @@index([projectId, revisionNumber(sort: Desc)])
+  @@index([contentHash])
+}
+
+model Asset {
+  id           String      @id @default(uuid()) @db.Uuid
+  kind         AssetKind
+  status       AssetStatus @default(PROCESSING)
+  originalName String      @db.VarChar(500)
+  storedName   String      @unique @db.VarChar(200)
+  relativePath String      @unique @db.VarChar(1000)
+  mimeType     String      @db.VarChar(200)
+  sizeBytes    BigInt
+  sha256       String      @db.VarChar(64)
+  width        Int?
+  height       Int?
+  durationMs   BigInt?
+  hasAudio     Boolean?
+  errorCode    String?     @db.VarChar(100)
+  errorMessage String?     @db.Text
+  metadata     Json?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  projects  ProjectAsset[]
+  revisions RevisionAsset[]
+
+  @@index([status, createdAt(sort: Desc)])
+  @@index([kind, createdAt(sort: Desc)])
+  @@index([sha256])
+}
+
+model ProjectAsset {
+  projectId String   @db.Uuid
+  assetId   String   @db.Uuid
+  createdAt DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  asset   Asset   @relation(fields: [assetId], references: [id], onDelete: Restrict)
+
+  @@id([projectId, assetId])
+  @@index([assetId])
+}
+
+model RevisionAsset {
+  revisionId String   @db.Uuid
+  assetId    String   @db.Uuid
+  createdAt  DateTime @default(now())
+
+  revision ProjectRevision @relation(fields: [revisionId], references: [id], onDelete: Cascade)
+  asset    Asset           @relation(fields: [assetId], references: [id], onDelete: Restrict)
+
+  @@id([revisionId, assetId])
+  @@index([assetId])
+}
+
+model RenderJob {
+  id              String       @id @default(uuid()) @db.Uuid
+  projectId       String       @db.Uuid
+  revisionId      String       @db.Uuid
+  status          RenderStatus @default(QUEUED)
+  preset          String       @db.VarChar(100)
+  priority        Int          @default(0)
+  progress        Float        @default(0)
+  renderedFrames  Int?
+  encodedFrames   Int?
+  totalFrames     Int?
+  stageMessage    String?      @db.VarChar(500)
+  workerId        String?      @db.VarChar(200)
+  attempt         Int          @default(0)
+  maxAttempts     Int          @default(2)
+  errorCode       String?      @db.VarChar(100)
+  errorMessage    String?      @db.Text
+  technicalError  String?      @db.Text
+  availableAt     DateTime     @default(now())
+  heartbeatAt     DateTime?
+  startedAt       DateTime?
+  finishedAt      DateTime?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  project  Project         @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  revision ProjectRevision @relation(fields: [revisionId], references: [id], onDelete: Restrict)
+  outputs  RenderOutput[]
+
+  @@index([status, availableAt, priority, createdAt])
+  @@index([projectId, createdAt(sort: Desc)])
+  @@index([revisionId])
+  @@index([workerId, status])
+}
+
+model RenderOutput {
+  id          String     @id @default(uuid()) @db.Uuid
+  renderJobId String     @db.Uuid
+  kind        OutputKind
+  relativePath String    @unique @db.VarChar(1000)
+  fileName    String     @db.VarChar(500)
+  mimeType    String     @db.VarChar(200)
+  sizeBytes   BigInt
+  width       Int?
+  height      Int?
+  durationMs  BigInt?
+  metadata    Json?
+  createdAt   DateTime   @default(now())
+
+  renderJob RenderJob @relation(fields: [renderJobId], references: [id], onDelete: Cascade)
+
+  @@index([renderJobId, kind])
+}
+
+model WorkerHeartbeat {
+  workerId         String       @id @db.VarChar(200)
+  appVersion       String       @db.VarChar(100)
+  remotionVersion  String       @db.VarChar(100)
+  status           WorkerStatus
+  currentJobId     String?      @db.Uuid
+  ffmpegAvailable  Boolean
+  browserAvailable Boolean
+  storageWritable  Boolean
+  details          Json?
+  startedAt        DateTime     @default(now())
+  lastSeenAt       DateTime     @updatedAt
+
+  @@index([lastSeenAt])
+}
+
+model AppSetting {
+  key       String   @id @db.VarChar(200)
+  value     Json
+  updatedAt DateTime @updatedAt
+}
+
+model IdempotencyRecord {
+  key          String   @id @db.VarChar(200)
+  requestHash  String   @db.VarChar(64)
+  responseCode Int
+  responseBody Json
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+
+  @@index([expiresAt])
+}
