@@ -287,4 +287,4 @@ Required:
 
 ## 11. Machine-readable schema
 
-See `schemas/prisma/schema.prisma`.
+See `packages/database/prisma/schema.prisma`.

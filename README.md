@@ -49,7 +49,7 @@ Người dùng tự viết kịch bản ở bên ngoài, sau đó:
 
 ## File có thể dùng trực tiếp
 
-- `schemas/prisma/schema.prisma`: Prisma schema mục tiêu.
+- `packages/database/prisma/schema.prisma`: Prisma schema đang được ứng dụng sử dụng.
 - `schemas/openapi.yaml`: OpenAPI 3.1 contract.
 - `schemas/project.schema.json`: JSON Schema của ProjectDocument.
 - `examples/project.example.json`: project mẫu.
