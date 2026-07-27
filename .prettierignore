@@ -1,0 +1,14 @@
+node_modules/
+.pnpm-store/
+.turbo/
+.next/
+dist/
+coverage/
+pnpm-lock.yaml
+
+docs/
+docker/
+examples/
+schemas/
+README.md
+MANIFEST.json

@@ -1,0 +1,28 @@
+{
+  "name": "hansys-video-studio",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Local-first scene-based video creation and rendering tool",
+  "packageManager": "pnpm@11.9.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "turbo run lint && eslint tests eslint.config.mjs prettier.config.mjs --max-warnings=0",
+    "test": "vitest run",
+    "typecheck": "turbo run typecheck && tsc --project tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^22.20.1",
+    "eslint": "^10.8.0",
+    "prettier": "^3.9.6",
+    "turbo": "^2.10.7",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.65.0",
+    "vitest": "^4.1.10"
+  }
+}
