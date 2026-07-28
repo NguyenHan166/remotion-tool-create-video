@@ -7,6 +7,14 @@ export {
   type WorkerHeartbeatSnapshot,
 } from './health.js';
 export { createHealthHandler, type GetHealth } from './health-handler.js';
+export { createAssetCollectionHandlers } from './assets/handlers.js';
+export {
+  DefaultAssetUploadService,
+  type AssetResponse,
+  type AssetUploadService,
+  type MultipartUploadFile,
+  type UploadAssetInput,
+} from './assets/service.js';
 export {
   createProjectCollectionHandlers,
   createProjectResourceHandlers,

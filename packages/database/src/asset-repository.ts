@@ -9,12 +9,14 @@ import type {
 } from '../generated/prisma/client.js';
 
 export type CreateAssetRecordInput = {
+  id?: string;
   kind: AssetKind;
   originalName: string;
   fileExtension: string;
   mimeType: string;
   sizeBytes: bigint;
   sha256: string;
+  projectId?: string;
 };
 
 export type ListAssetRecordsInput = {
@@ -47,7 +49,7 @@ export class PrismaAssetRepository implements AssetRepository {
   }
 
   async create(input: CreateAssetRecordInput): Promise<Asset> {
-    const id = this.#createId();
+    const id = input.id ?? this.#createId();
     const storageLocation = createAssetStorageLocation(id, input.fileExtension);
 
     return this.#database.asset.create({
@@ -60,6 +62,15 @@ export class PrismaAssetRepository implements AssetRepository {
         mimeType: input.mimeType,
         sizeBytes: input.sizeBytes,
         sha256: input.sha256,
+        ...(input.projectId === undefined
+          ? {}
+          : {
+              projects: {
+                create: {
+                  projectId: input.projectId,
+                },
+              },
+            }),
       },
     });
   }
