@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
+  Prisma,
   PrismaAssetRepository,
   type Asset,
   type PrismaClient,
@@ -148,6 +149,86 @@ describe('Prisma asset repository', () => {
           contains: 'bản tin',
           mode: 'insensitive',
         },
+      },
+    });
+  });
+
+  it('persists successful metadata and diagnostic failure states', async () => {
+    const update = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ...storedAsset,
+        status: 'READY',
+        width: 1920,
+        height: 1080,
+        durationMs: 2500n,
+        hasAudio: true,
+      })
+      .mockResolvedValueOnce({
+        ...storedAsset,
+        status: 'FAILED',
+        errorCode: 'MEDIA_METADATA_EXTRACTION_FAILED',
+        errorMessage: 'Media metadata could not be extracted.',
+      });
+    const database = {
+      asset: {
+        update,
+      },
+    } as unknown as PrismaClient;
+    const repository = new PrismaAssetRepository(database);
+
+    await repository.markReady({
+      assetId: storedAsset.id,
+      width: 1920,
+      height: 1080,
+      durationMs: 2500n,
+      hasAudio: true,
+      metadata: {
+        formatName: 'mov,mp4',
+        streamCount: 2,
+        videoCodec: 'h264',
+        audioCodec: 'aac',
+      },
+    });
+    await repository.markFailed({
+      assetId: storedAsset.id,
+      errorCode: 'MEDIA_METADATA_EXTRACTION_FAILED',
+      errorMessage: 'Media metadata could not be extracted.',
+    });
+
+    expect(update).toHaveBeenNthCalledWith(1, {
+      where: {
+        id: storedAsset.id,
+      },
+      data: {
+        status: 'READY',
+        width: 1920,
+        height: 1080,
+        durationMs: 2500n,
+        hasAudio: true,
+        metadata: {
+          formatName: 'mov,mp4',
+          streamCount: 2,
+          videoCodec: 'h264',
+          audioCodec: 'aac',
+        },
+        errorCode: null,
+        errorMessage: null,
+      },
+    });
+    expect(update).toHaveBeenNthCalledWith(2, {
+      where: {
+        id: storedAsset.id,
+      },
+      data: {
+        status: 'FAILED',
+        width: null,
+        height: null,
+        durationMs: null,
+        hasAudio: null,
+        metadata: Prisma.DbNull,
+        errorCode: 'MEDIA_METADATA_EXTRACTION_FAILED',
+        errorMessage: 'Media metadata could not be extracted.',
       },
     });
   });

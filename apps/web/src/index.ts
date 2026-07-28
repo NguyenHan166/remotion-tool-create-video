@@ -9,6 +9,18 @@ export {
 export { createHealthHandler, type GetHealth } from './health-handler.js';
 export { createAssetCollectionHandlers } from './assets/handlers.js';
 export {
+  FfprobeMediaMetadataExtractor,
+  FfprobeUnavailableError,
+  MediaMetadataExtractionError,
+  parseFfprobeMediaMetadata,
+  runFfprobe,
+  type ExtractedMediaMetadata,
+  type FfprobeRunner,
+  type MediaMetadataExtractor,
+  type MediaMetadataSummary,
+} from './assets/media-metadata.js';
+export {
+  AssetMetadataProcessingError,
   DefaultAssetUploadService,
   type AssetResponse,
   type AssetUploadService,

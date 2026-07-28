@@ -1,0 +1,14 @@
+{
+  "streams": [
+    {
+      "index": 0,
+      "codec_name": "mp3",
+      "codec_type": "audio",
+      "duration": "1.234567"
+    }
+  ],
+  "format": {
+    "format_name": "mp3",
+    "duration": "1.234567"
+  }
+}

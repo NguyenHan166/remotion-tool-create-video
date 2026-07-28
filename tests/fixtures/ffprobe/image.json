@@ -1,0 +1,14 @@
+{
+  "streams": [
+    {
+      "index": 0,
+      "codec_name": "png",
+      "codec_type": "video",
+      "width": 640,
+      "height": 360
+    }
+  ],
+  "format": {
+    "format_name": "png_pipe"
+  }
+}

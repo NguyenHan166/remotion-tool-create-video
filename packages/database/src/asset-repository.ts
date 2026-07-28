@@ -1,12 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { createAssetStorageLocation } from '@hansys/storage';
-import type {
-  Asset,
-  AssetKind,
-  AssetStatus,
-  Prisma,
-  PrismaClient,
-} from '../generated/prisma/client.js';
+import { Prisma } from '../generated/prisma/client.js';
+import type { Asset, AssetKind, AssetStatus, PrismaClient } from '../generated/prisma/client.js';
 
 export type CreateAssetRecordInput = {
   id?: string;
@@ -33,8 +28,25 @@ export type AssetRecordPage = {
   total: number;
 };
 
+export type MarkAssetReadyInput = {
+  assetId: string;
+  width: number | null;
+  height: number | null;
+  durationMs: bigint | null;
+  hasAudio: boolean;
+  metadata: Record<string, string | number | boolean>;
+};
+
+export type MarkAssetFailedInput = {
+  assetId: string;
+  errorCode: string;
+  errorMessage: string;
+};
+
 export interface AssetRepository {
   create(input: CreateAssetRecordInput): Promise<Asset>;
+  markReady(input: MarkAssetReadyInput): Promise<Asset>;
+  markFailed(input: MarkAssetFailedInput): Promise<Asset>;
   findById(assetId: string): Promise<Asset | null>;
   list(input: ListAssetRecordsInput): Promise<AssetRecordPage>;
 }
@@ -79,6 +91,49 @@ export class PrismaAssetRepository implements AssetRepository {
     return this.#database.asset.findUnique({
       where: {
         id: assetId,
+      },
+    });
+  }
+
+  async markReady({
+    assetId,
+    width,
+    height,
+    durationMs,
+    hasAudio,
+    metadata,
+  }: MarkAssetReadyInput): Promise<Asset> {
+    return this.#database.asset.update({
+      where: {
+        id: assetId,
+      },
+      data: {
+        status: 'READY',
+        width,
+        height,
+        durationMs,
+        hasAudio,
+        metadata,
+        errorCode: null,
+        errorMessage: null,
+      },
+    });
+  }
+
+  async markFailed({ assetId, errorCode, errorMessage }: MarkAssetFailedInput): Promise<Asset> {
+    return this.#database.asset.update({
+      where: {
+        id: assetId,
+      },
+      data: {
+        status: 'FAILED',
+        width: null,
+        height: null,
+        durationMs: null,
+        hasAudio: null,
+        metadata: Prisma.DbNull,
+        errorCode,
+        errorMessage,
       },
     });
   }

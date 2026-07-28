@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { UnsupportedMediaTypeError, UploadTooLargeError } from '@hansys/storage';
 import { z } from 'zod';
-import { type AssetUploadService } from './service.js';
+import { AssetMetadataProcessingError, type AssetUploadService } from './service.js';
 
 type ErrorDetail = {
   path: string;
@@ -46,6 +46,27 @@ function createErrorResponse(request: Request, options: ErrorResponseOptions): R
 }
 
 function handleUploadError(request: Request, error: unknown): Response {
+  if (error instanceof AssetMetadataProcessingError) {
+    return createErrorResponse(request, {
+      status: error.responseStatus,
+      code: error.responseCode,
+      message:
+        error.responseCode === 'UNSUPPORTED_MEDIA_TYPE'
+          ? 'The uploaded media could not be read.'
+          : 'Media metadata extraction is unavailable.',
+      ...(error.responseCode === 'UNSUPPORTED_MEDIA_TYPE'
+        ? {
+            details: [
+              {
+                path: 'file',
+                message: 'The media container or streams are invalid.',
+              },
+            ],
+          }
+        : {}),
+    });
+  }
+
   if (error instanceof UploadTooLargeError) {
     return createErrorResponse(request, {
       status: 413,

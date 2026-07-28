@@ -16,6 +16,8 @@ export {
   type AssetRepository,
   type CreateAssetRecordInput,
   type ListAssetRecordsInput,
+  type MarkAssetFailedInput,
+  type MarkAssetReadyInput,
 } from './asset-repository.js';
 export { computeProjectContentHash } from './project-content-hash.js';
 export {

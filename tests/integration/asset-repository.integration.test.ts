@@ -75,4 +75,59 @@ integrationTest('Prisma asset repository integration', () => {
       total: 1,
     });
   });
+
+  it('persists READY metadata and FAILED diagnostics', async () => {
+    const assetId = randomUUID();
+    const repository = new PrismaAssetRepository(database, () => assetId);
+    createdAssetIds.push(assetId);
+    await repository.create({
+      kind: 'VIDEO',
+      originalName: 'fixture.mp4',
+      fileExtension: 'mp4',
+      mimeType: 'video/mp4',
+      sizeBytes: 256n,
+      sha256: 'e'.repeat(64),
+    });
+
+    const ready = await repository.markReady({
+      assetId,
+      width: 1920,
+      height: 1080,
+      durationMs: 2500n,
+      hasAudio: true,
+      metadata: {
+        formatName: 'mov,mp4',
+        streamCount: 2,
+        videoCodec: 'h264',
+        audioCodec: 'aac',
+      },
+    });
+
+    expect(ready).toMatchObject({
+      status: 'READY',
+      width: 1920,
+      height: 1080,
+      durationMs: 2500n,
+      hasAudio: true,
+      errorCode: null,
+      errorMessage: null,
+    });
+
+    const failed = await repository.markFailed({
+      assetId,
+      errorCode: 'MEDIA_METADATA_EXTRACTION_FAILED',
+      errorMessage: 'Media metadata could not be extracted.',
+    });
+
+    expect(failed).toMatchObject({
+      status: 'FAILED',
+      width: null,
+      height: null,
+      durationMs: null,
+      hasAudio: null,
+      metadata: null,
+      errorCode: 'MEDIA_METADATA_EXTRACTION_FAILED',
+      errorMessage: 'Media metadata could not be extracted.',
+    });
+  });
 });

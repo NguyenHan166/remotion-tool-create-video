@@ -4,10 +4,16 @@ import {
   assertUploadSize,
   createAssetStorageLocation,
   removeStoredAssetFile,
+  safeJoin,
   storeAssetFileAtomically,
   validateMediaUpload,
   type StoragePaths,
 } from '@hansys/storage';
+import {
+  FfprobeMediaMetadataExtractor,
+  FfprobeUnavailableError,
+  type MediaMetadataExtractor,
+} from './media-metadata.js';
 
 export type AssetResponse = {
   id: string;
@@ -42,6 +48,18 @@ export type UploadAssetInput = Readonly<{
 
 export interface AssetUploadService {
   upload(input: UploadAssetInput): Promise<AssetResponse>;
+}
+
+export class AssetMetadataProcessingError extends Error {
+  readonly responseCode: 'INTERNAL_ERROR' | 'UNSUPPORTED_MEDIA_TYPE';
+  readonly responseStatus: 415 | 500;
+
+  constructor(unavailable: boolean, cause: unknown) {
+    super('Asset metadata extraction failed.', { cause });
+    this.name = 'AssetMetadataProcessingError';
+    this.responseCode = unavailable ? 'INTERNAL_ERROR' : 'UNSUPPORTED_MEDIA_TYPE';
+    this.responseStatus = unavailable ? 500 : 415;
+  }
 }
 
 function toSafeNumber(value: bigint): number {
@@ -85,18 +103,21 @@ export class DefaultAssetUploadService implements AssetUploadService {
   readonly #storagePaths: StoragePaths;
   readonly #maxUploadBytes: number;
   readonly #createId: () => string;
+  readonly #metadataExtractor: MediaMetadataExtractor;
 
   constructor(
     repository: AssetRepository,
     storagePaths: StoragePaths,
     maxUploadBytes: number,
     createId: () => string = randomUUID,
+    metadataExtractor: MediaMetadataExtractor = new FfprobeMediaMetadataExtractor(),
   ) {
     assertUploadSize(0, maxUploadBytes);
     this.#repository = repository;
     this.#storagePaths = storagePaths;
     this.#maxUploadBytes = maxUploadBytes;
     this.#createId = createId;
+    this.#metadataExtractor = metadataExtractor;
   }
 
   async upload({ file, projectId }: UploadAssetInput): Promise<AssetResponse> {
@@ -111,7 +132,7 @@ export class DefaultAssetUploadService implements AssetUploadService {
     await storeAssetFileAtomically(this.#storagePaths, storageLocation.relativePath, bytes);
 
     try {
-      const asset = await this.#repository.create({
+      await this.#repository.create({
         id: assetId,
         kind: validatedUpload.kind,
         originalName: file.name,
@@ -121,13 +142,43 @@ export class DefaultAssetUploadService implements AssetUploadService {
         sha256: validatedUpload.sha256,
         ...(projectId === undefined ? {} : { projectId }),
       });
-
-      return toAssetResponse(asset);
     } catch (error) {
       await removeStoredAssetFile(this.#storagePaths, storageLocation.relativePath).catch(
         () => undefined,
       );
       throw error;
     }
+
+    let metadata: Awaited<ReturnType<MediaMetadataExtractor['extract']>>;
+
+    try {
+      metadata = await this.#metadataExtractor.extract({
+        kind: validatedUpload.kind,
+        filePath: safeJoin(this.#storagePaths.root, storageLocation.relativePath),
+      });
+    } catch (error) {
+      const unavailable = error instanceof FfprobeUnavailableError;
+
+      await this.#repository.markFailed({
+        assetId,
+        errorCode: unavailable ? 'FFPROBE_UNAVAILABLE' : 'MEDIA_METADATA_EXTRACTION_FAILED',
+        errorMessage: unavailable
+          ? 'ffprobe is unavailable.'
+          : 'Media metadata could not be extracted.',
+      });
+
+      throw new AssetMetadataProcessingError(unavailable, error);
+    }
+
+    const readyAsset = await this.#repository.markReady({
+      assetId,
+      width: metadata.width,
+      height: metadata.height,
+      durationMs: metadata.durationMs,
+      hasAudio: metadata.hasAudio,
+      metadata: metadata.metadata,
+    });
+
+    return toAssetResponse(readyAsset);
   }
 }
