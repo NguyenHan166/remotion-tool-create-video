@@ -10,7 +10,9 @@ export { createHealthHandler, type GetHealth } from './health-handler.js';
 export {
   createAssetCollectionHandlers,
   createAssetFileHandlers,
+  createAssetResourceHandlers,
   type AssetFileRouteContext,
+  type AssetResourceRouteContext,
 } from './assets/handlers.js';
 export {
   AssetFileNotFoundError,
@@ -31,9 +33,12 @@ export {
   type MediaMetadataSummary,
 } from './assets/media-metadata.js';
 export {
+  AssetRecordNotFoundError,
   AssetMetadataProcessingError,
   DefaultAssetUploadService,
+  type AssetPageResponse,
   type AssetResponse,
+  type AssetService,
   type AssetUploadService,
   type MultipartUploadFile,
   type UploadAssetInput,

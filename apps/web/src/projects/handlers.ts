@@ -36,7 +36,7 @@ type ErrorEnvelope = {
 };
 
 export type ProjectRouteContext = {
-  params: Promise<{ projectId: string }> | { projectId: string };
+  params: Promise<{ projectId: string }>;
 };
 
 type ErrorResponseOptions = {

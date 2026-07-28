@@ -11,6 +11,7 @@ export {
   type ProjectRevision,
 } from '../generated/prisma/client.js';
 export {
+  AssetInUseError,
   PrismaAssetRepository,
   type AssetRecordPage,
   type AssetRepository,

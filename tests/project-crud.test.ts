@@ -358,7 +358,7 @@ describe('project CRUD API', () => {
     const created = (await createResponse.json()) as {
       document: Record<string, unknown>;
     };
-    const context = { params: { projectId } };
+    const context = { params: Promise.resolve({ projectId }) };
     const updateBody = {
       expectedDraftVersion: 1,
       document: created.document,
@@ -404,7 +404,7 @@ describe('project CRUD API', () => {
           schemaVersion: 99,
         },
       }),
-      { params: { projectId } },
+      { params: Promise.resolve({ projectId }) },
     );
 
     expect(invalidCreate.status).toBe(400);
@@ -435,7 +435,7 @@ describe('project CRUD API', () => {
     const handlers = createTestHandlers();
     const response = await handlers.resource.GET(
       new Request(`http://localhost/api/v1/projects/${projectId}`),
-      { params: { projectId } },
+      { params: Promise.resolve({ projectId }) },
     );
 
     expect(response.status).toBe(404);
@@ -472,7 +472,7 @@ describe('project CRUD API', () => {
           ],
         },
       }),
-      { params: { projectId } },
+      { params: Promise.resolve({ projectId }) },
     );
 
     expect(response.status).toBe(404);
@@ -506,7 +506,7 @@ describe('project CRUD API', () => {
     const source = (await createResponse.json()) as {
       document: Record<string, unknown>;
     };
-    const context = { params: { projectId } };
+    const context = { params: Promise.resolve({ projectId }) };
     const duplicateResponse = await handlers.duplicate.POST(
       new Request(`http://localhost/api/v1/projects/${projectId}/duplicate`, {
         method: 'POST',
@@ -579,7 +579,7 @@ describe('project CRUD API', () => {
         fps: 30,
       }),
     );
-    const context = { params: { projectId } };
+    const context = { params: Promise.resolve({ projectId }) };
     const previewResponse = await handlers.scriptPreview.POST(
       createJsonRequest('POST', `http://localhost/api/v1/projects/${projectId}/script-preview`, {
         rawText:

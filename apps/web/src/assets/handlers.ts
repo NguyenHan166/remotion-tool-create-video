@@ -1,16 +1,22 @@
 import { randomUUID } from 'node:crypto';
+import { AssetInUseError } from '@hansys/database';
 import {
   InvalidByteRangeError,
   UnsupportedMediaTypeError,
   UploadTooLargeError,
 } from '@hansys/storage';
-import { z } from 'zod';
+import { type ZodError, type ZodIssue } from 'zod';
+import { assetIdSchema, listAssetsQuerySchema } from './contracts.js';
 import {
   AssetFileNotFoundError,
   AssetNotReadyError,
   type AssetFileService,
 } from './file-service.js';
-import { AssetMetadataProcessingError, type AssetUploadService } from './service.js';
+import {
+  AssetMetadataProcessingError,
+  AssetRecordNotFoundError,
+  type AssetService,
+} from './service.js';
 
 type ErrorDetail = {
   path: string;
@@ -34,8 +40,12 @@ type ErrorResponseOptions = {
   headers?: HeadersInit;
 };
 
-const projectIdSchema = z.uuid();
-const assetIdSchema = z.uuid();
+function formatZodIssues(error: ZodError): ErrorDetail[] {
+  return error.issues.map((issue: ZodIssue) => ({
+    path: issue.path.length === 0 ? 'request' : issue.path.map(String).join('.'),
+    message: issue.message,
+  }));
+}
 
 function createErrorResponse(request: Request, options: ErrorResponseOptions): Response {
   const requestId = request.headers.get('x-request-id') ?? randomUUID();
@@ -58,7 +68,7 @@ function createErrorResponse(request: Request, options: ErrorResponseOptions): R
 }
 
 export type AssetFileRouteContext = {
-  params: Promise<{ assetId: string }> | { assetId: string };
+  params: Promise<{ assetId: string }>;
 };
 
 export function createAssetFileHandlers(service: AssetFileService): {
@@ -130,6 +140,76 @@ export function createAssetFileHandlers(service: AssetFileService): {
       }
     },
   };
+}
+
+export type AssetResourceRouteContext = {
+  params: Promise<{ assetId: string }>;
+};
+
+async function parseAssetId(
+  request: Request,
+  context: AssetResourceRouteContext,
+): Promise<
+  | {
+      success: true;
+      assetId: string;
+    }
+  | {
+      success: false;
+      response: Response;
+    }
+> {
+  const { assetId } = await context.params;
+  const result = assetIdSchema.safeParse(assetId);
+
+  if (!result.success) {
+    return {
+      success: false,
+      response: createErrorResponse(request, {
+        status: 400,
+        code: 'BAD_REQUEST',
+        message: 'Asset ID is invalid.',
+        details: formatZodIssues(result.error),
+      }),
+    };
+  }
+
+  return {
+    success: true,
+    assetId: result.data,
+  };
+}
+
+function handleAssetServiceError(request: Request, error: unknown): Response {
+  if (error instanceof AssetRecordNotFoundError) {
+    return createErrorResponse(request, {
+      status: 404,
+      code: error.code,
+      message: 'Asset not found.',
+    });
+  }
+
+  if (error instanceof AssetInUseError) {
+    return createErrorResponse(request, {
+      status: 409,
+      code: error.code,
+      message: 'Asset is in use and cannot be deleted.',
+      details: [
+        {
+          path: 'assetId',
+          message:
+            `Referenced by ${error.projectReferenceCount} project(s) and ` +
+            `${error.revisionReferenceCount} revision(s).`,
+        },
+      ],
+    });
+  }
+
+  return createErrorResponse(request, {
+    status: 500,
+    code: 'INTERNAL_ERROR',
+    message: 'An unexpected error occurred.',
+  });
 }
 
 function handleUploadError(request: Request, error: unknown): Response {
@@ -207,10 +287,37 @@ function invalidMultipartResponse(
   });
 }
 
-export function createAssetCollectionHandlers(service: AssetUploadService): {
+export function createAssetCollectionHandlers(service: AssetService): {
+  GET: (request: Request) => Promise<Response>;
   POST: (request: Request) => Promise<Response>;
 } {
   return {
+    GET: async (request) => {
+      const url = new URL(request.url);
+      const queryResult = listAssetsQuerySchema.safeParse({
+        page: url.searchParams.get('page') ?? undefined,
+        pageSize: url.searchParams.get('pageSize') ?? undefined,
+        projectId: url.searchParams.get('projectId') || undefined,
+        kind: url.searchParams.get('kind') ?? undefined,
+        status: url.searchParams.get('status') ?? undefined,
+        search: url.searchParams.get('search') || undefined,
+      });
+
+      if (!queryResult.success) {
+        return createErrorResponse(request, {
+          status: 400,
+          code: 'BAD_REQUEST',
+          message: 'Asset query is invalid.',
+          details: formatZodIssues(queryResult.error),
+        });
+      }
+
+      try {
+        return Response.json(await service.list(queryResult.data));
+      } catch (error) {
+        return handleAssetServiceError(request, error);
+      }
+    },
     POST: async (request) => {
       const contentType = request.headers.get('content-type')?.toLowerCase();
 
@@ -264,7 +371,7 @@ export function createAssetCollectionHandlers(service: AssetUploadService): {
       const projectValue = projectValues[0];
 
       if (typeof projectValue === 'string' && projectValue.length > 0) {
-        const projectIdResult = projectIdSchema.safeParse(projectValue);
+        const projectIdResult = assetIdSchema.safeParse(projectValue);
 
         if (!projectIdResult.success) {
           return invalidMultipartResponse(request, 'projectId', 'projectId must be a valid UUID.');
@@ -283,6 +390,42 @@ export function createAssetCollectionHandlers(service: AssetUploadService): {
         );
       } catch (error) {
         return handleUploadError(request, error);
+      }
+    },
+  };
+}
+
+export function createAssetResourceHandlers(service: AssetService): {
+  GET: (request: Request, context: AssetResourceRouteContext) => Promise<Response>;
+  DELETE: (request: Request, context: AssetResourceRouteContext) => Promise<Response>;
+} {
+  return {
+    GET: async (request, context) => {
+      const assetIdResult = await parseAssetId(request, context);
+
+      if (!assetIdResult.success) {
+        return assetIdResult.response;
+      }
+
+      try {
+        return Response.json(await service.get(assetIdResult.assetId));
+      } catch (error) {
+        return handleAssetServiceError(request, error);
+      }
+    },
+    DELETE: async (request, context) => {
+      const assetIdResult = await parseAssetId(request, context);
+
+      if (!assetIdResult.success) {
+        return assetIdResult.response;
+      }
+
+      try {
+        await service.delete(assetIdResult.assetId);
+
+        return new Response(null, { status: 204 });
+      } catch (error) {
+        return handleAssetServiceError(request, error);
       }
     },
   };

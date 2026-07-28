@@ -66,6 +66,10 @@ class StreamingAssetRepository implements AssetRepository {
     throw new Error('Not implemented in streaming fixture repository.');
   }
 
+  async markDeleted(): Promise<Asset | null> {
+    throw new Error('Not implemented in streaming fixture repository.');
+  }
+
   async findById(id: string): Promise<Asset | null> {
     return this.#asset?.id === id ? this.#asset : null;
   }
@@ -116,14 +120,12 @@ function createRequest(range?: string): Request {
 }
 
 function createContext(id = assetId): {
-  params: {
-    assetId: string;
-  };
+  params: Promise<{ assetId: string }>;
 } {
   return {
-    params: {
+    params: Promise.resolve({
       assetId: id,
-    },
+    }),
   };
 }
 

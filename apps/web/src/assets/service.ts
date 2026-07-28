@@ -14,6 +14,7 @@ import {
   FfprobeUnavailableError,
   type MediaMetadataExtractor,
 } from './media-metadata.js';
+import { type ListAssetsQuery } from './contracts.js';
 
 export type AssetResponse = {
   id: string;
@@ -46,8 +47,29 @@ export type UploadAssetInput = Readonly<{
   projectId?: string;
 }>;
 
-export interface AssetUploadService {
+export type AssetPageResponse = {
+  items: AssetResponse[];
+  page: number;
+  pageSize: number;
+  total: number;
+};
+
+export interface AssetService {
   upload(input: UploadAssetInput): Promise<AssetResponse>;
+  list(input: ListAssetsQuery): Promise<AssetPageResponse>;
+  get(assetId: string): Promise<AssetResponse>;
+  delete(assetId: string): Promise<void>;
+}
+
+export type AssetUploadService = Pick<AssetService, 'upload'>;
+
+export class AssetRecordNotFoundError extends Error {
+  readonly code = 'ASSET_NOT_FOUND';
+
+  constructor() {
+    super('Asset not found.');
+    this.name = 'AssetRecordNotFoundError';
+  }
 }
 
 export class AssetMetadataProcessingError extends Error {
@@ -76,7 +98,7 @@ function toNullableSafeNumber(value: bigint | null): number | null {
   return value === null ? null : toSafeNumber(value);
 }
 
-function toAssetResponse(asset: Asset): AssetResponse {
+export function toAssetResponse(asset: Asset): AssetResponse {
   return {
     id: asset.id,
     kind: asset.kind,
@@ -98,7 +120,7 @@ function toAssetResponse(asset: Asset): AssetResponse {
   };
 }
 
-export class DefaultAssetUploadService implements AssetUploadService {
+export class DefaultAssetUploadService implements AssetService {
   readonly #repository: AssetRepository;
   readonly #storagePaths: StoragePaths;
   readonly #maxUploadBytes: number;
@@ -180,5 +202,43 @@ export class DefaultAssetUploadService implements AssetUploadService {
     });
 
     return toAssetResponse(readyAsset);
+  }
+
+  async list(input: ListAssetsQuery): Promise<AssetPageResponse> {
+    const page = await this.#repository.list({
+      page: input.page,
+      pageSize: input.pageSize,
+      ...(input.projectId === undefined ? {} : { projectId: input.projectId }),
+      ...(input.kind === undefined ? {} : { kind: input.kind }),
+      ...(input.status === undefined ? {} : { status: input.status }),
+      ...(input.search === undefined ? {} : { search: input.search }),
+    });
+
+    return {
+      items: page.items.map(toAssetResponse),
+      page: input.page,
+      pageSize: input.pageSize,
+      total: page.total,
+    };
+  }
+
+  async get(assetId: string): Promise<AssetResponse> {
+    const asset = await this.#repository.findById(assetId);
+
+    if (asset === null || asset.status === 'DELETED') {
+      throw new AssetRecordNotFoundError();
+    }
+
+    return toAssetResponse(asset);
+  }
+
+  async delete(assetId: string): Promise<void> {
+    const asset = await this.#repository.markDeleted(assetId);
+
+    if (asset === null) {
+      throw new AssetRecordNotFoundError();
+    }
+
+    await removeStoredAssetFile(this.#storagePaths, asset.relativePath);
   }
 }

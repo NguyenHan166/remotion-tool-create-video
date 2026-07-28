@@ -188,6 +188,19 @@ class RecordingAssetRepository implements AssetRepository {
     return this.#asset;
   }
 
+  async markDeleted(): Promise<Asset | null> {
+    if (this.#asset === null) {
+      return null;
+    }
+
+    this.#asset = {
+      ...this.#asset,
+      status: 'DELETED',
+    };
+
+    return this.#asset;
+  }
+
   async findById(): Promise<Asset | null> {
     return null;
   }

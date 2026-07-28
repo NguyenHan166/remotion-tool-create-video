@@ -43,10 +43,26 @@ export type MarkAssetFailedInput = {
   errorMessage: string;
 };
 
+export class AssetInUseError extends Error {
+  readonly code = 'ASSET_IN_USE';
+  readonly assetId: string;
+  readonly projectReferenceCount: number;
+  readonly revisionReferenceCount: number;
+
+  constructor(assetId: string, projectReferenceCount: number, revisionReferenceCount: number) {
+    super('Asset is referenced and cannot be deleted.');
+    this.name = 'AssetInUseError';
+    this.assetId = assetId;
+    this.projectReferenceCount = projectReferenceCount;
+    this.revisionReferenceCount = revisionReferenceCount;
+  }
+}
+
 export interface AssetRepository {
   create(input: CreateAssetRecordInput): Promise<Asset>;
   markReady(input: MarkAssetReadyInput): Promise<Asset>;
   markFailed(input: MarkAssetFailedInput): Promise<Asset>;
+  markDeleted(assetId: string): Promise<Asset | null>;
   findById(assetId: string): Promise<Asset | null>;
   list(input: ListAssetRecordsInput): Promise<AssetRecordPage>;
 }
@@ -138,6 +154,49 @@ export class PrismaAssetRepository implements AssetRepository {
     });
   }
 
+  async markDeleted(assetId: string): Promise<Asset | null> {
+    return this.#database.$transaction(async (transaction) => {
+      const lockedAssets = await transaction.$queryRaw<Array<{ id: string }>>(
+        Prisma.sql`
+          SELECT id
+          FROM "Asset"
+          WHERE id = ${assetId}::uuid
+          FOR UPDATE
+        `,
+      );
+
+      if (lockedAssets.length === 0) {
+        return null;
+      }
+
+      const [projectReferenceCount, revisionReferenceCount] = await Promise.all([
+        transaction.projectAsset.count({
+          where: {
+            assetId,
+          },
+        }),
+        transaction.revisionAsset.count({
+          where: {
+            assetId,
+          },
+        }),
+      ]);
+
+      if (projectReferenceCount > 0 || revisionReferenceCount > 0) {
+        throw new AssetInUseError(assetId, projectReferenceCount, revisionReferenceCount);
+      }
+
+      return transaction.asset.update({
+        where: {
+          id: assetId,
+        },
+        data: {
+          status: 'DELETED',
+        },
+      });
+    });
+  }
+
   async list({
     page,
     pageSize,
@@ -157,7 +216,9 @@ export class PrismaAssetRepository implements AssetRepository {
             },
           }),
       ...(kind === undefined ? {} : { kind }),
-      ...(status === undefined ? {} : { status }),
+      status: status ?? {
+        not: 'DELETED',
+      },
       ...(search === undefined
         ? {}
         : {
