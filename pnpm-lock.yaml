@@ -77,6 +77,9 @@ importers:
       '@hansys/project-schema':
         specifier: workspace:*
         version: link:../project-schema
+      '@hansys/storage':
+        specifier: workspace:*
+        version: link:../storage
       '@prisma/adapter-pg':
         specifier: 7.9.0
         version: 7.9.0

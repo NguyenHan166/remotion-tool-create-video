@@ -14,6 +14,11 @@ export const STORAGE_DIRECTORY_NAMES = {
 
 export type StorageDirectoryKey = keyof typeof STORAGE_DIRECTORY_NAMES;
 
+export type AssetStorageLocation = Readonly<{
+  storedName: string;
+  relativePath: string;
+}>;
+
 export type StoragePaths = Readonly<
   {
     root: string;
@@ -76,6 +81,44 @@ function getSafeComponents(pathSegment: string): string[] {
   }
 
   return components;
+}
+
+function normalizeAssetId(assetId: string): string {
+  const normalizedAssetId = assetId.toLowerCase();
+
+  if (
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(
+      normalizedAssetId,
+    )
+  ) {
+    throw new StoragePathError('Asset ID must be a UUID');
+  }
+
+  return normalizedAssetId;
+}
+
+function normalizeFileExtension(fileExtension: string): string {
+  const normalizedExtension = fileExtension.toLowerCase().replace(/^\./, '');
+
+  if (!/^[a-z0-9]{1,10}$/.test(normalizedExtension)) {
+    throw new StoragePathError(
+      'Asset file extension must contain 1-10 lowercase letters or digits',
+    );
+  }
+
+  return normalizedExtension;
+}
+
+export function createAssetStorageLocation(
+  assetId: string,
+  fileExtension: string,
+): AssetStorageLocation {
+  const storedName = `${normalizeAssetId(assetId)}.${normalizeFileExtension(fileExtension)}`;
+
+  return Object.freeze({
+    storedName,
+    relativePath: `${STORAGE_DIRECTORY_NAMES.assets}/${storedName}`,
+  });
 }
 
 export function safeJoin(root: string, ...relativeSegments: string[]): string {

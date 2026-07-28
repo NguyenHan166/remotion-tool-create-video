@@ -104,6 +104,10 @@ One physical file and its metadata.
 
 A failed asset record is retained for diagnostics until cleanup.
 
+`originalName` is display metadata only and is never used as a disk path. Stored files use
+`assets/<asset UUID>.<normalized extension>`; `storedName` contains only the UUID-based file name
+and `relativePath` always uses forward slashes.
+
 ### ProjectAsset
 
 Tracks asset membership in the editable project.
