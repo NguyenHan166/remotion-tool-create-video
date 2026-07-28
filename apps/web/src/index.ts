@@ -7,7 +7,18 @@ export {
   type WorkerHeartbeatSnapshot,
 } from './health.js';
 export { createHealthHandler, type GetHealth } from './health-handler.js';
-export { createAssetCollectionHandlers } from './assets/handlers.js';
+export {
+  createAssetCollectionHandlers,
+  createAssetFileHandlers,
+  type AssetFileRouteContext,
+} from './assets/handlers.js';
+export {
+  AssetFileNotFoundError,
+  AssetNotReadyError,
+  DefaultAssetFileService,
+  type AssetFileService,
+  type AssetFileStreamResponse,
+} from './assets/file-service.js';
 export {
   FfprobeMediaMetadataExtractor,
   FfprobeUnavailableError,

@@ -216,7 +216,7 @@ export function validateMediaUpload(
   });
 }
 
-function resolveAssetPath(paths: StoragePaths, relativePath: string): string {
+export function resolveStoredAssetPath(paths: StoragePaths, relativePath: string): string {
   const assetPath = safeJoin(paths.root, relativePath);
   const pathFromAssets = relative(paths.assets, assetPath);
 
@@ -241,7 +241,7 @@ export async function storeAssetFileAtomically(
   relativePath: string,
   bytes: Uint8Array,
 ): Promise<void> {
-  const assetPath = resolveAssetPath(paths, relativePath);
+  const assetPath = resolveStoredAssetPath(paths, relativePath);
   const temporaryPath = safeJoin(paths.temp, `.asset-upload-${randomUUID()}.tmp`);
   let temporaryFile: Awaited<ReturnType<typeof open>> | undefined;
 
@@ -266,7 +266,7 @@ export async function removeStoredAssetFile(
   paths: StoragePaths,
   relativePath: string,
 ): Promise<void> {
-  const assetPath = resolveAssetPath(paths, relativePath);
+  const assetPath = resolveStoredAssetPath(paths, relativePath);
 
   await unlink(assetPath).catch((error: unknown) => {
     if (!isMissingFileError(error)) {

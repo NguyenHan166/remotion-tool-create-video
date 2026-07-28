@@ -1,6 +1,15 @@
 import { randomUUID } from 'node:crypto';
-import { UnsupportedMediaTypeError, UploadTooLargeError } from '@hansys/storage';
+import {
+  InvalidByteRangeError,
+  UnsupportedMediaTypeError,
+  UploadTooLargeError,
+} from '@hansys/storage';
 import { z } from 'zod';
+import {
+  AssetFileNotFoundError,
+  AssetNotReadyError,
+  type AssetFileService,
+} from './file-service.js';
 import { AssetMetadataProcessingError, type AssetUploadService } from './service.js';
 
 type ErrorDetail = {
@@ -22,9 +31,11 @@ type ErrorResponseOptions = {
   code: string;
   message: string;
   details?: readonly ErrorDetail[];
+  headers?: HeadersInit;
 };
 
 const projectIdSchema = z.uuid();
+const assetIdSchema = z.uuid();
 
 function createErrorResponse(request: Request, options: ErrorResponseOptions): Response {
   const requestId = request.headers.get('x-request-id') ?? randomUUID();
@@ -37,12 +48,88 @@ function createErrorResponse(request: Request, options: ErrorResponseOptions): R
     },
   };
 
+  const headers = new Headers(options.headers);
+  headers.set('X-Request-ID', requestId);
+
   return Response.json(body, {
     status: options.status,
-    headers: {
-      'X-Request-ID': requestId,
-    },
+    headers,
   });
+}
+
+export type AssetFileRouteContext = {
+  params: Promise<{ assetId: string }> | { assetId: string };
+};
+
+export function createAssetFileHandlers(service: AssetFileService): {
+  GET: (request: Request, context: AssetFileRouteContext) => Promise<Response>;
+} {
+  return {
+    GET: async (request, context) => {
+      const { assetId } = await context.params;
+      const assetIdResult = assetIdSchema.safeParse(assetId);
+
+      if (!assetIdResult.success) {
+        return createErrorResponse(request, {
+          status: 400,
+          code: 'BAD_REQUEST',
+          message: 'Asset ID is invalid.',
+          details: [
+            {
+              path: 'assetId',
+              message: assetIdResult.error.issues[0]?.message ?? 'Must be a UUID',
+            },
+          ],
+        });
+      }
+
+      try {
+        const result = await service.stream(
+          assetIdResult.data,
+          request.headers.get('range') ?? undefined,
+        );
+
+        return new Response(result.body, {
+          status: result.status,
+          headers: result.headers,
+        });
+      } catch (error) {
+        if (error instanceof InvalidByteRangeError) {
+          return createErrorResponse(request, {
+            status: 416,
+            code: 'BAD_REQUEST',
+            message: 'Requested byte range is not satisfiable.',
+            headers: {
+              'Accept-Ranges': 'bytes',
+              'Content-Range': `bytes */${error.fileSize}`,
+            },
+          });
+        }
+
+        if (error instanceof AssetFileNotFoundError) {
+          return createErrorResponse(request, {
+            status: 404,
+            code: error.code,
+            message: 'Asset not found.',
+          });
+        }
+
+        if (error instanceof AssetNotReadyError) {
+          return createErrorResponse(request, {
+            status: 409,
+            code: error.code,
+            message: 'Asset is not ready for streaming.',
+          });
+        }
+
+        return createErrorResponse(request, {
+          status: 500,
+          code: 'INTERNAL_ERROR',
+          message: 'An unexpected error occurred.',
+        });
+      }
+    },
+  };
 }
 
 function handleUploadError(request: Request, error: unknown): Response {
