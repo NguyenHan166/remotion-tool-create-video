@@ -1,10 +1,10 @@
 'use client';
 
-import { Player } from '@remotion/player';
+import { Player, type PlayerRef } from '@remotion/player';
 import { useQuery } from '@tanstack/react-query';
 import { ProjectVideo, getTotalDurationInFrames } from '@hansys/video';
 import Link from 'next/link';
-import { useCallback, useMemo, useReducer } from 'react';
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import {
   ProjectApiError,
   createPreviewProps,
@@ -24,10 +24,18 @@ import {
   type SceneEditorDraftState,
   type SceneEditorStateUpdater,
 } from '../../../src/projects/editor-state';
+import {
+  clampPlayerFrame,
+  createSceneTimeline,
+  getActiveTimelineItem,
+  getAdjacentSceneStartFrame,
+  type SceneSeekDirection,
+} from '../../../src/projects/player-timeline';
 import { useProjectAutosave } from '../../../src/projects/use-project-autosave';
 import { AutosaveStatus } from './autosave-status';
 import { SceneInspector } from './scene-inspector';
 import { SceneList } from './scene-list';
+import { SceneStripControls } from './scene-strip-controls';
 
 function projectErrorMessage(error: unknown): string {
   if (error instanceof ProjectApiError) {
@@ -117,11 +125,113 @@ function LoadedProjectEditor({
     });
   }, []);
   const durationInFrames = getTotalDurationInFrames(draft);
+  const initialPlayerFrame = Math.min(15, durationInFrames - 1);
+  const playerRef = useRef<PlayerRef>(null);
+  const [currentFrame, setCurrentFrame] = useState(initialPlayerFrame);
+  const [isMuted, setIsMuted] = useState(draft.export.muted);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const timeline = useMemo(() => createSceneTimeline(draft), [draft]);
+  const activeTimelineItem = useMemo(
+    () => getActiveTimelineItem(timeline, currentFrame),
+    [currentFrame, timeline],
+  );
   const inputProps = useMemo(() => createPreviewProps(draft), [draft]);
   const maximumPlayerWidth = getResponsivePlayerMaxWidth(
     draft.composition.width,
     draft.composition.height,
   );
+  const seekPlayer = useCallback(
+    (frame: number, sceneId?: string) => {
+      const targetFrame = clampPlayerFrame(frame, durationInFrames);
+      playerRef.current?.seekTo(targetFrame);
+      setCurrentFrame(targetFrame);
+
+      if (sceneId !== undefined) {
+        updateEditor((current) => selectScene(current, sceneId));
+      }
+    },
+    [durationInFrames, updateEditor],
+  );
+  const seekAdjacentScene = useCallback(
+    (direction: SceneSeekDirection) => {
+      const targetFrame = getAdjacentSceneStartFrame(timeline, currentFrame, direction);
+      const targetScene = getActiveTimelineItem(timeline, targetFrame);
+      seekPlayer(targetFrame, targetScene?.sceneId);
+    },
+    [currentFrame, seekPlayer, timeline],
+  );
+  const toggleMute = useCallback(() => {
+    const player = playerRef.current;
+
+    if (player === null) {
+      return;
+    }
+
+    if (player.isMuted()) {
+      player.unmute();
+    } else {
+      player.mute();
+    }
+  }, []);
+  const togglePlay = useCallback(() => {
+    const player = playerRef.current;
+
+    if (player === null) {
+      return;
+    }
+
+    if (player.isPlaying()) {
+      player.pause();
+    } else {
+      player.play();
+    }
+  }, []);
+
+  useEffect(() => {
+    const player = playerRef.current;
+
+    if (player === null) {
+      return;
+    }
+
+    const updateFrame = (event: { detail: { frame: number } }) => {
+      setCurrentFrame(clampPlayerFrame(event.detail.frame, durationInFrames));
+    };
+    const updateMute = (event: { detail: { isMuted: boolean } }) => {
+      setIsMuted(event.detail.isMuted);
+    };
+    const markPlaying = () => {
+      setIsPlaying(true);
+    };
+    const markPaused = () => {
+      setIsPlaying(false);
+    };
+
+    player.addEventListener('frameupdate', updateFrame);
+    player.addEventListener('seeked', updateFrame);
+    player.addEventListener('mutechange', updateMute);
+    player.addEventListener('play', markPlaying);
+    player.addEventListener('pause', markPaused);
+    player.addEventListener('ended', markPaused);
+
+    return () => {
+      player.removeEventListener('frameupdate', updateFrame);
+      player.removeEventListener('seeked', updateFrame);
+      player.removeEventListener('mutechange', updateMute);
+      player.removeEventListener('play', markPlaying);
+      player.removeEventListener('pause', markPaused);
+      player.removeEventListener('ended', markPaused);
+    };
+  }, [durationInFrames]);
+
+  useEffect(() => {
+    const clampedFrame = clampPlayerFrame(currentFrame, durationInFrames);
+
+    if (clampedFrame !== currentFrame) {
+      playerRef.current?.seekTo(clampedFrame);
+      setCurrentFrame(clampedFrame);
+    }
+  }, [currentFrame, durationInFrames]);
 
   return (
     <main className="min-h-screen">
@@ -200,6 +310,7 @@ function LoadedProjectEditor({
               }}
             >
               <Player
+                ref={playerRef}
                 acknowledgeRemotionLicense
                 allowFullscreen
                 clickToPlay
@@ -210,7 +321,7 @@ function LoadedProjectEditor({
                 durationInFrames={durationInFrames}
                 errorFallback={({ error }) => <PreviewError error={error} />}
                 fps={draft.composition.fps}
-                initialFrame={Math.min(15, durationInFrames - 1)}
+                initialFrame={initialPlayerFrame}
                 inputProps={inputProps}
                 initiallyMuted={draft.export.muted}
                 showVolumeControls
@@ -219,6 +330,25 @@ function LoadedProjectEditor({
               />
             </div>
           </div>
+
+          <SceneStripControls
+            activeSceneId={activeTimelineItem?.sceneId ?? null}
+            currentFrame={currentFrame}
+            fps={draft.composition.fps}
+            isMuted={isMuted}
+            isPlaying={isPlaying}
+            timeline={timeline}
+            totalFrames={durationInFrames}
+            onSeek={seekPlayer}
+            onSeekNext={() => {
+              seekAdjacentScene('next');
+            }}
+            onSeekPrevious={() => {
+              seekAdjacentScene('previous');
+            }}
+            onToggleMute={toggleMute}
+            onTogglePlay={togglePlay}
+          />
         </section>
 
         <aside className="min-w-0">

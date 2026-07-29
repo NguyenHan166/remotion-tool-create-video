@@ -238,6 +238,63 @@ test.describe('project editor preview', () => {
     expect(renderRequests).toEqual([]);
   });
 
+  test('seeks exact scene boundaries and keeps the active strip item in sync', async ({ page }) => {
+    const autosaveRequests = await mockAutosavingProject(
+      page,
+      createProjectPayload('Player Controls Project'),
+    );
+
+    await page.goto(`/projects/${projectId}`);
+
+    const stripItems = page.getByTestId('scene-strip-item');
+    const playerTime = page.getByTestId('player-time');
+    await expect(stripItems).toHaveCount(2);
+    await expect(stripItems.nth(0)).toHaveAttribute('data-start-frame', '0');
+    await expect(stripItems.nth(1)).toHaveAttribute('data-start-frame', '90');
+    await expect(stripItems.nth(0)).toHaveAttribute('data-active', 'true');
+    await expect(playerTime).toHaveAttribute('data-frame', '15');
+
+    await page.getByRole('button', { name: 'Scene tiếp theo' }).click();
+    await expect(playerTime).toHaveAttribute('data-frame', '90');
+    await expect(stripItems.nth(0)).toHaveAttribute('data-active', 'false');
+    await expect(stripItems.nth(1)).toHaveAttribute('data-active', 'true');
+    await expect(page.getByLabel('Tiêu đề')).toHaveValue(
+      'Một nguồn dữ liệu cho cả xem trước và kết xuất',
+    );
+
+    await page.getByRole('button', { name: 'Scene trước' }).click();
+    await expect(playerTime).toHaveAttribute('data-frame', '0');
+    await expect(stripItems.nth(0)).toHaveAttribute('data-active', 'true');
+
+    const timeSlider = page.getByLabel('Tua theo thời gian');
+    await timeSlider.fill('89');
+    await expect(playerTime).toHaveAttribute('data-frame', '89');
+    await expect(stripItems.nth(0)).toHaveAttribute('data-active', 'true');
+
+    await timeSlider.fill('90');
+    await expect(playerTime).toHaveAttribute('data-frame', '90');
+    await expect(stripItems.nth(1)).toHaveAttribute('data-active', 'true');
+
+    await page.getByRole('button', { name: 'Tắt tiếng' }).click();
+    await expect(page.getByRole('button', { name: 'Bật tiếng' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    await page.getByRole('button', { name: 'Bật tiếng' }).click();
+    await expect(page.getByRole('button', { name: 'Tắt tiếng' })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    );
+
+    await page.getByRole('button', { name: 'Phát', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Tạm dừng', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Tạm dừng', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Phát', exact: true })).toBeVisible();
+
+    await page.waitForTimeout(300);
+    expect(autosaveRequests).toHaveLength(0);
+  });
+
   test('edits validated scene fields from the inspector', async ({ page }) => {
     await mockAutosavingProject(page, createProjectPayload('Inspector Project'));
 
