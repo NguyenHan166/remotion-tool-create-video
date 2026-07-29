@@ -4,18 +4,27 @@ import { type VideoProps } from './types.js';
 export const STUDIO_PROJECT_FIXTURE = ProjectDocumentSchema.parse({
   schemaVersion: 1,
   metadata: {
-    title: 'Bản tin mẫu',
-    description: 'Fixture mặc định cho Remotion Studio.',
+    title: 'Bản tin công nghệ',
+    description: 'Fixture tiếng Việt mặc định cho Remotion Studio.',
   },
   composition: {
     width: 1080,
     height: 1920,
     fps: 30,
-    backgroundColor: '#090B10',
+    backgroundColor: '#F4F1EB',
   },
   template: {
     id: 'news-clean-v1',
     version: 1,
+  },
+  theme: {
+    primaryColor: '#0E2238',
+    secondaryColor: '#E8E2D8',
+    accentColor: '#D85C32',
+    textColor: '#13202C',
+    mutedTextColor: '#52616D',
+    fontFamily: 'BeVietnamPro',
+    watermarkText: 'HANSYS',
   },
   scenes: [
     {
@@ -25,8 +34,8 @@ export const STUDIO_PROJECT_FIXTURE = ProjectDocumentSchema.parse({
       enabled: true,
       durationInFrames: 90,
       text: {
-        label: 'HANSYS STUDIO',
-        headline: 'Khởi tạo composition dùng chung',
+        label: 'CÔNG NGHỆ',
+        headline: 'Nền tảng dựng video nay có một composition dùng chung',
       },
       style: {
         textAlign: 'left',
@@ -40,7 +49,9 @@ export const STUDIO_PROJECT_FIXTURE = ProjectDocumentSchema.parse({
       enabled: true,
       durationInFrames: 120,
       text: {
-        body: 'Metadata được tính trực tiếp từ ProjectDocument.',
+        headline: 'Một nguồn dữ liệu cho cả xem trước và kết xuất',
+        body: 'Metadata được tính trực tiếp từ ProjectDocument, giúp thời lượng và khung hình luôn nhất quán.',
+        source: 'Nguồn: HanSYS Video Studio',
       },
       style: {
         textAlign: 'left',

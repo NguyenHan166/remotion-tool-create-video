@@ -39,3 +39,14 @@ export class TemplateVersionMismatchError extends Error {
     this.availableVersion = availableVersion;
   }
 }
+
+export class TemplateRendererNotRegisteredError extends Error {
+  readonly code = 'TEMPLATE_RENDERER_NOT_REGISTERED';
+  readonly templateId: string;
+
+  constructor(templateId: string) {
+    super(`Template renderer "${templateId}" has not been registered by the video package.`);
+    this.name = 'TemplateRendererNotRegisteredError';
+    this.templateId = templateId;
+  }
+}

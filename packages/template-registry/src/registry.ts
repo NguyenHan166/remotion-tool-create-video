@@ -3,6 +3,7 @@ import {
   TemplateNotFoundError,
   TemplateVersionMismatchError,
 } from './errors.js';
+import { newsCleanV1 } from './templates/news-clean-v1.js';
 import { type TemplateManifest, type TemplateMetadata, type TemplateRegistry } from './types.js';
 
 export function defineTemplateRegistry<const TRegistry extends TemplateRegistry>(
@@ -17,8 +18,9 @@ export function defineTemplateRegistry<const TRegistry extends TemplateRegistry>
   return Object.freeze({ ...registry });
 }
 
-// Template implementations are added explicitly by later commits.
-export const templateRegistry = defineTemplateRegistry({});
+export const templateRegistry = defineTemplateRegistry({
+  [newsCleanV1.id]: newsCleanV1,
+});
 
 export function getTemplate(
   templateId: string,

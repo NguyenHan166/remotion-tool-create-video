@@ -1,13 +1,7 @@
 import { type ProjectDocumentV1Input } from '@hansys/project-schema';
+import { type TemplateAsset } from '@hansys/template-registry';
 
-export type ResolvedAsset = {
-  id: string;
-  kind: 'IMAGE' | 'VIDEO' | 'AUDIO' | 'LOGO';
-  src: string;
-  width?: number;
-  height?: number;
-  durationMs?: number;
-};
+export type ResolvedAsset = TemplateAsset;
 
 export type VideoProps = {
   project: ProjectDocumentV1Input;
