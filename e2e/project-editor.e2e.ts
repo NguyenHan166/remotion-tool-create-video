@@ -9,6 +9,37 @@ test.describe('project editor preview', () => {
     'Set E2E_BASE_URL to a running web application.',
   );
 
+  test.beforeEach(async ({ page }) => {
+    await page.route('**/api/v1/assets?*', async (route) => {
+      await route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({
+          items: [
+            {
+              id: '88888888-8888-4888-8888-888888888888',
+              kind: 'IMAGE',
+              status: 'READY',
+              originalName: 'news-image.jpg',
+              mimeType: 'image/jpeg',
+              sizeBytes: 1_024,
+              width: 1080,
+              height: 1920,
+              durationMs: null,
+              hasAudio: null,
+              errorCode: null,
+              errorMessage: null,
+              createdAt: '2026-07-29T00:00:00.000Z',
+              updatedAt: '2026-07-29T00:00:00.000Z',
+            },
+          ],
+          page: 1,
+          pageSize: 100,
+          total: 1,
+        }),
+      });
+    });
+  });
+
   test('updates the Remotion Player from local draft text without a render request', async ({
     page,
   }) => {
@@ -38,7 +69,7 @@ test.describe('project editor preview', () => {
 
     await expect(page.getByRole('heading', { name: 'Xem trước dự án' })).toBeVisible();
     const headline = 'Tiêu đề thay đổi ngay trong Player';
-    await page.getByLabel('Tiêu đề scene đang xem trước').fill(headline);
+    await page.getByLabel('Tiêu đề').fill(headline);
     await expect(page.getByTestId('remotion-player')).toContainText(headline);
 
     const sceneItems = page.getByTestId('scene-list-item');
@@ -48,7 +79,7 @@ test.describe('project editor preview', () => {
     );
 
     await page.getByRole('button', { name: 'Chọn scene Nội dung' }).click();
-    await expect(page.getByLabel('Tiêu đề scene đang xem trước')).toHaveValue(
+    await expect(page.getByLabel('Tiêu đề')).toHaveValue(
       'Một nguồn dữ liệu cho cả xem trước và kết xuất',
     );
     await page.getByRole('button', { name: 'Di chuyển scene lên' }).click();
@@ -73,6 +104,44 @@ test.describe('project editor preview', () => {
     await page.getByRole('button', { name: 'Xóa scene' }).click();
     await expect(sceneItems).toHaveCount(3);
     expect(renderRequests).toEqual([]);
+  });
+
+  test('edits validated scene fields from the inspector', async ({ page }) => {
+    await page.route(`**/api/v1/projects/${projectId}`, async (route) => {
+      await route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({
+          id: projectId,
+          name: 'Inspector Project',
+          description: null,
+          status: 'DRAFT',
+          draftVersion: 1,
+          document: STUDIO_PROJECT_FIXTURE,
+          createdAt: '2026-07-29T00:00:00.000Z',
+          updatedAt: '2026-07-29T00:00:00.000Z',
+        }),
+      });
+    });
+
+    await page.goto(`/projects/${projectId}`);
+    await page.getByLabel('Tên scene').fill('Danh sách điểm chính');
+    await page.getByLabel('Loại scene').selectOption('bullet-list');
+    await page.getByLabel('Tiêu đề').fill('Ba điểm đáng chú ý');
+    await page.getByLabel('Danh sách bullet').fill('Tốc độ\nỔn định\nDễ sử dụng');
+    await page.getByLabel('Căn chữ').selectOption('right');
+    await page.getByLabel('Mức nhấn mạnh').selectOption('urgent');
+    await page.getByLabel('Biến thể template').selectOption('compact');
+
+    await expect(page.getByTestId('scene-list-item').first()).toContainText('Danh sách điểm chính');
+    await expect(page.getByTestId('remotion-player')).toContainText('Ba điểm đáng chú ý');
+
+    await page.getByLabel('Thời lượng frame').fill('5');
+    await expect(page.getByTestId('inspector-validation-error')).toBeVisible();
+    await expect(page.getByLabel('Thời lượng frame')).toHaveValue('90');
+
+    await page.getByLabel('Thời lượng frame').fill('180');
+    await expect(page.getByTestId('inspector-validation-error')).not.toBeVisible();
+    await expect(page.getByLabel('Thời lượng frame')).toHaveValue('180');
   });
 
   test('shows the Player error state for an unavailable template', async ({ page }) => {

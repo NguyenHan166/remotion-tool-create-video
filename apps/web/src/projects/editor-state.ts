@@ -1,9 +1,10 @@
 import {
   PROJECT_DOCUMENT_DEFAULTS,
+  ProjectDocumentSchema,
+  SceneV1Schema,
   type ProjectDocumentV1,
   type SceneV1,
 } from '@hansys/project-schema';
-import { updateSceneHeadline } from './client.js';
 
 export type SceneEditorState = {
   document: ProjectDocumentV1;
@@ -11,6 +12,20 @@ export type SceneEditorState = {
 };
 
 export type SceneMoveDirection = 'up' | 'down';
+export type SceneUpdateResult =
+  | {
+      success: true;
+      state: SceneEditorState;
+    }
+  | {
+      success: false;
+      error: {
+        path: string;
+        message: string;
+      };
+    };
+
+export type SceneUpdater = (scene: SceneV1) => SceneV1;
 
 const MAX_SCENES = 100;
 
@@ -160,12 +175,73 @@ export function moveSelectedScene(
   };
 }
 
+export function updateSelectedScene(
+  state: SceneEditorState,
+  updater: SceneUpdater,
+): SceneUpdateResult {
+  const sceneIndex = getSceneIndex(state);
+  const nextScene = updater(getSelectedScene(state));
+  const sceneResult = SceneV1Schema.safeParse(nextScene);
+
+  if (!sceneResult.success) {
+    const issue = sceneResult.error.issues[0] ?? {
+      path: [],
+      message: 'Scene is invalid.',
+    };
+
+    return {
+      success: false,
+      error: {
+        path: issue.path.join('.'),
+        message: issue.message,
+      },
+    };
+  }
+
+  const nextDocument = {
+    ...state.document,
+    scenes: state.document.scenes.map((scene, index) =>
+      index === sceneIndex ? sceneResult.data : scene,
+    ),
+  };
+
+  const documentResult = ProjectDocumentSchema.safeParse(nextDocument);
+
+  if (!documentResult.success) {
+    const issue = documentResult.error.issues[0] ?? {
+      path: [],
+      message: 'Project document is invalid.',
+    };
+
+    return {
+      success: false,
+      error: {
+        path: issue.path.join('.'),
+        message: issue.message,
+      },
+    };
+  }
+
+  return {
+    success: true,
+    state: {
+      ...state,
+      document: documentResult.data,
+    },
+  };
+}
+
 export function updateSelectedSceneHeadline(
   state: SceneEditorState,
   headline: string,
 ): SceneEditorState {
-  return {
-    ...state,
-    document: updateSceneHeadline(state.document, state.selectedSceneId, headline),
-  };
+  const result = updateSelectedScene(state, (scene) => ({
+    ...scene,
+    text: {
+      ...scene.text,
+      headline,
+    },
+  }));
+
+  return result.success ? result.state : state;
 }

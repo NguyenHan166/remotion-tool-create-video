@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { PROJECT_SCENE_TYPES } from '../packages/project-schema/src/index.js';
 import {
   addScene,
   createSceneEditorState,
@@ -7,6 +8,7 @@ import {
   getSelectedScene,
   moveSelectedScene,
   selectScene,
+  updateSelectedScene,
 } from '../apps/web/src/projects/editor-state.js';
 import { STUDIO_PROJECT_FIXTURE } from '../packages/video/src/fixture.js';
 
@@ -98,5 +100,111 @@ describe('project scene editor state', () => {
 
     expect(addScene(state, state.document.scenes[1]!.id)).toBe(state);
     expect(duplicateSelectedScene(state, state.document.scenes[1]!.id)).toBe(state);
+  });
+
+  it.each(PROJECT_SCENE_TYPES)('edits the MVP "%s" scene type', (type) => {
+    const state = createSceneEditorState(structuredClone(STUDIO_PROJECT_FIXTURE));
+    const result = updateSelectedScene(state, (scene) => ({
+      ...scene,
+      type,
+      name: `Scene ${type}`,
+      durationInFrames: 180,
+      text: {
+        label: 'Tin mới',
+        headline: `Tiêu đề ${type}`,
+        body: 'Nội dung đã chỉnh sửa',
+        source: 'HanSYS',
+        ...(type === 'bullet-list' ? { bullets: ['Ý thứ nhất', 'Ý thứ hai'] } : {}),
+        ...(type === 'quote' ? { quoteAuthor: 'Tác giả' } : {}),
+      },
+      ...(type === 'image' || type === 'video'
+        ? {
+            media: {
+              assetId: '88888888-8888-4888-8888-888888888888',
+              fit: 'contain' as const,
+              positionX: 0.25,
+              positionY: 0.75,
+              scale: 1.2,
+              startFromMs: 500,
+              playbackRate: 1.25,
+              muted: false,
+            },
+          }
+        : {}),
+      style: {
+        variant: 'compact',
+        textAlign: 'right',
+        emphasis: 'urgent',
+      },
+    }));
+
+    expect(result.success).toBe(true);
+    if (!result.success) {
+      return;
+    }
+
+    expect(getSelectedScene(result.state)).toMatchObject({
+      type,
+      name: `Scene ${type}`,
+      durationInFrames: 180,
+      text: {
+        headline: `Tiêu đề ${type}`,
+      },
+      style: {
+        variant: 'compact',
+        textAlign: 'right',
+        emphasis: 'urgent',
+      },
+    });
+  });
+
+  it('rejects invalid fields before replacing editor state', () => {
+    const state = createSceneEditorState(structuredClone(STUDIO_PROJECT_FIXTURE));
+    const invalidDuration = updateSelectedScene(state, (scene) => ({
+      ...scene,
+      durationInFrames: 5,
+    }));
+    const invalidHeadline = updateSelectedScene(state, (scene) => ({
+      ...scene,
+      text: {
+        ...scene.text,
+        headline: 'x'.repeat(301),
+      },
+    }));
+    const invalidMediaPosition = updateSelectedScene(state, (scene) => ({
+      ...scene,
+      type: 'image',
+      media: {
+        assetId: '88888888-8888-4888-8888-888888888888',
+        fit: 'cover',
+        positionX: 1.1,
+        positionY: 0.5,
+        scale: 1,
+        startFromMs: 0,
+        playbackRate: 1,
+        muted: true,
+      },
+    }));
+
+    expect(invalidDuration).toMatchObject({ success: false });
+    expect(invalidHeadline).toMatchObject({ success: false });
+    expect(invalidMediaPosition).toMatchObject({ success: false });
+    expect(state.document).toEqual(STUDIO_PROJECT_FIXTURE);
+  });
+
+  it('rejects an edit that pushes the enabled project past 180 seconds', () => {
+    const state = createSceneEditorState(structuredClone(STUDIO_PROJECT_FIXTURE));
+    const result = updateSelectedScene(state, (scene) => ({
+      ...scene,
+      durationInFrames: 5_290,
+    }));
+
+    expect(result).toMatchObject({
+      success: false,
+      error: {
+        message: expect.stringContaining('180'),
+      },
+    });
+    expect(getSelectedScene(state).durationInFrames).toBe(90);
   });
 });

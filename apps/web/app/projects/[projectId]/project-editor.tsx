@@ -17,11 +17,10 @@ import {
   createSceneEditorState,
   deleteSelectedScene,
   duplicateSelectedScene,
-  getSelectedScene,
   moveSelectedScene,
   selectScene,
-  updateSelectedSceneHeadline,
 } from '../../../src/projects/editor-state';
+import { SceneInspector } from './scene-inspector';
 import { SceneList } from './scene-list';
 
 function projectErrorMessage(error: unknown): string {
@@ -63,7 +62,6 @@ function LoadedProjectEditor({ project }: { project: ProjectDto }) {
     createSceneEditorState(structuredClone(project.document)),
   );
   const draft = editorState.document;
-  const selectedScene = getSelectedScene(editorState);
   const durationInFrames = getTotalDurationInFrames(draft);
   const inputProps = useMemo(() => createPreviewProps(draft), [draft]);
   const maximumPlayerWidth = getResponsivePlayerMaxWidth(
@@ -170,40 +168,11 @@ function LoadedProjectEditor({ project }: { project: ProjectDto }) {
         </section>
 
         <aside className="min-w-0">
-          <section className="rounded-2xl border border-white/10 bg-[#10151e] p-5 shadow-[0_18px_50px_rgba(0,0,0,0.18)]">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                  Scene đang xem
-                </p>
-                <h2 className="mt-1 text-base font-semibold text-white">{selectedScene.name}</h2>
-              </div>
-              <span className="rounded-lg border border-orange-400/20 bg-orange-400/8 px-2.5 py-1 font-mono text-[10px] uppercase tracking-wider text-orange-300">
-                {selectedScene.type}
-              </span>
-            </div>
-
-            <label className="mt-6 block">
-              <span className="text-xs font-medium text-slate-300">
-                Tiêu đề scene đang xem trước
-              </span>
-              <textarea
-                value={selectedScene.text.headline ?? ''}
-                maxLength={300}
-                rows={6}
-                onChange={(event) => {
-                  const headline = event.target.value;
-                  setEditorState((current) => updateSelectedSceneHeadline(current, headline));
-                }}
-                className="mt-2 w-full resize-y rounded-xl border border-white/10 bg-black/20 px-3.5 py-3 text-sm leading-6 text-white outline-none transition placeholder:text-slate-600 focus:border-orange-400/50 focus:ring-3 focus:ring-orange-400/10"
-                placeholder="Nhập tiêu đề để xem Player cập nhật ngay…"
-              />
-            </label>
-            <div className="mt-3 flex items-center justify-between text-[11px] text-slate-500">
-              <span>Cập nhật trực tiếp, không render MP4</span>
-              <span>{selectedScene.text.headline?.length ?? 0}/300</span>
-            </div>
-          </section>
+          <SceneInspector
+            key={editorState.selectedSceneId}
+            state={editorState}
+            onChange={setEditorState}
+          />
 
           <section className="mt-4 rounded-2xl border border-sky-400/15 bg-sky-400/[0.055] p-4">
             <p className="text-xs font-semibold text-sky-200">Bản nháp cục bộ</p>
