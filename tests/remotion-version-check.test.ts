@@ -61,7 +61,7 @@ describe('Remotion version checker', () => {
 
     expect(result.status).toBe(0);
     expect(result.stdout).toMatch(
-      /All 5 declared and \d+ locked Remotion packages use exactly 4\.0\.499\./,
+      /All 6 declared and \d+ locked Remotion packages use exactly 4\.0\.499\./,
     );
   });
 

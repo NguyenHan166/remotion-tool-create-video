@@ -3,12 +3,26 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "exports": {
+    ".": "./src/project-video.tsx",
+    "./fixture": "./src/fixture.ts",
+    "./root": "./src/root.tsx"
+  },
   "scripts": {
-    "lint": "eslint src --max-warnings=0",
+    "lint": "eslint src remotion.config.ts --max-warnings=0",
+    "studio": "remotion studio src/index.ts",
     "typecheck": "tsc --project tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@hansys/project-schema": "workspace:*",
     "@remotion/captions": "4.0.499",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
     "remotion": "4.0.499"
+  },
+  "devDependencies": {
+    "@remotion/cli": "4.0.499",
+    "@types/react": "19.2.17",
+    "@types/react-dom": "19.2.3"
   }
 }
