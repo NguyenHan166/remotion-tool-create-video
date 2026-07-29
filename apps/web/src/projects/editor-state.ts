@@ -11,6 +11,12 @@ export type SceneEditorState = {
   selectedSceneId: string;
 };
 
+export type SceneEditorDraftState = {
+  editor: SceneEditorState;
+  changeSequence: number;
+};
+
+export type SceneEditorStateUpdater = (state: SceneEditorState) => SceneEditorState;
 export type SceneMoveDirection = 'up' | 'down';
 export type SceneUpdateResult =
   | {
@@ -31,6 +37,46 @@ const MAX_SCENES = 100;
 
 function getSceneIndex(state: SceneEditorState): number {
   return state.document.scenes.findIndex((scene) => scene.id === state.selectedSceneId);
+}
+
+export function createSceneEditorDraftState(document: ProjectDocumentV1): SceneEditorDraftState {
+  return {
+    editor: createSceneEditorState(document),
+    changeSequence: 0,
+  };
+}
+
+export function updateSceneEditorDraft(
+  draft: SceneEditorDraftState,
+  updater: SceneEditorStateUpdater,
+): SceneEditorDraftState {
+  const editor = updater(draft.editor);
+
+  if (editor === draft.editor) {
+    return draft;
+  }
+
+  return {
+    editor,
+    changeSequence:
+      editor.document === draft.editor.document ? draft.changeSequence : draft.changeSequence + 1,
+  };
+}
+
+export function replaceSceneEditorDraft(
+  draft: SceneEditorDraftState,
+  document: ProjectDocumentV1,
+): SceneEditorDraftState {
+  const editor = createSceneEditorState(document);
+
+  if (document.scenes.some((scene) => scene.id === draft.editor.selectedSceneId)) {
+    editor.selectedSceneId = draft.editor.selectedSceneId;
+  }
+
+  return {
+    editor,
+    changeSequence: draft.changeSequence,
+  };
 }
 
 export function createSceneEditorState(document: ProjectDocumentV1): SceneEditorState {

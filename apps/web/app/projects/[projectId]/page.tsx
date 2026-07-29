@@ -1,4 +1,5 @@
 import { type Metadata } from 'next';
+import { webServerEnvironment } from '../../../src/environment';
 import { ProjectEditor } from './project-editor';
 
 export const metadata: Metadata = {
@@ -12,5 +13,10 @@ export default async function ProjectEditorPage({
 }) {
   const { projectId } = await params;
 
-  return <ProjectEditor projectId={projectId} />;
+  return (
+    <ProjectEditor
+      projectId={projectId}
+      autoSaveDelayMs={webServerEnvironment.AUTO_SAVE_DELAY_MS}
+    />
+  );
 }

@@ -4,7 +4,7 @@ import { Player } from '@remotion/player';
 import { useQuery } from '@tanstack/react-query';
 import { ProjectVideo, getTotalDurationInFrames } from '@hansys/video';
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useReducer } from 'react';
 import {
   ProjectApiError,
   createPreviewProps,
@@ -14,12 +14,18 @@ import {
 } from '../../../src/projects/client';
 import {
   addScene,
-  createSceneEditorState,
+  createSceneEditorDraftState,
   deleteSelectedScene,
   duplicateSelectedScene,
   moveSelectedScene,
+  replaceSceneEditorDraft,
   selectScene,
+  updateSceneEditorDraft,
+  type SceneEditorDraftState,
+  type SceneEditorStateUpdater,
 } from '../../../src/projects/editor-state';
+import { useProjectAutosave } from '../../../src/projects/use-project-autosave';
+import { AutosaveStatus } from './autosave-status';
 import { SceneInspector } from './scene-inspector';
 import { SceneList } from './scene-list';
 
@@ -57,11 +63,59 @@ function PreviewError({ error }: { error: Error }) {
   );
 }
 
-function LoadedProjectEditor({ project }: { project: ProjectDto }) {
-  const [editorState, setEditorState] = useState(() =>
-    createSceneEditorState(structuredClone(project.document)),
+type EditorDraftAction =
+  | {
+      type: 'update';
+      updater: SceneEditorStateUpdater;
+    }
+  | {
+      type: 'replace';
+      project: ProjectDto;
+    };
+
+function reduceEditorDraft(
+  state: SceneEditorDraftState,
+  action: EditorDraftAction,
+): SceneEditorDraftState {
+  if (action.type === 'replace') {
+    return replaceSceneEditorDraft(state, structuredClone(action.project.document));
+  }
+
+  return updateSceneEditorDraft(state, action.updater);
+}
+
+function LoadedProjectEditor({
+  project,
+  autoSaveDelayMs,
+}: {
+  project: ProjectDto;
+  autoSaveDelayMs: number;
+}) {
+  const [draftState, dispatchDraft] = useReducer(reduceEditorDraft, project.document, (document) =>
+    createSceneEditorDraftState(structuredClone(document)),
   );
+  const editorState = draftState.editor;
   const draft = editorState.document;
+  const useRemoteProject = useCallback((remoteProject: ProjectDto) => {
+    dispatchDraft({
+      type: 'replace',
+      project: remoteProject,
+    });
+  }, []);
+  const autosave = useProjectAutosave({
+    projectId: project.id,
+    initialDraftVersion: project.draftVersion,
+    document: draft,
+    changeSequence: draftState.changeSequence,
+    delayMs: autoSaveDelayMs,
+    onUseRemote: useRemoteProject,
+  });
+  const updateEditor = useCallback((updater: SceneEditorStateUpdater) => {
+    dispatchDraft({
+      type: 'update',
+      updater,
+    });
+  }, []);
   const durationInFrames = getTotalDurationInFrames(draft);
   const inputProps = useMemo(() => createPreviewProps(draft), [draft]);
   const maximumPlayerWidth = getResponsivePlayerMaxWidth(
@@ -82,7 +136,7 @@ function LoadedProjectEditor({ project }: { project: ProjectDto }) {
                 {project.name}
               </p>
               <p className="mt-0.5 text-[11px] text-slate-500">
-                Bản nháp v{project.draftVersion} · Xem trước trực tiếp
+                Bản nháp v{autosave.draftVersion} · Xem trước trực tiếp
               </p>
             </div>
           </div>
@@ -101,22 +155,22 @@ function LoadedProjectEditor({ project }: { project: ProjectDto }) {
             state={editorState}
             fps={draft.composition.fps}
             onAdd={() => {
-              setEditorState((current) => addScene(current, crypto.randomUUID()));
+              updateEditor((current) => addScene(current, crypto.randomUUID()));
             }}
             onDelete={() => {
-              setEditorState(deleteSelectedScene);
+              updateEditor(deleteSelectedScene);
             }}
             onDuplicate={() => {
-              setEditorState((current) => duplicateSelectedScene(current, crypto.randomUUID()));
+              updateEditor((current) => duplicateSelectedScene(current, crypto.randomUUID()));
             }}
             onMoveDown={() => {
-              setEditorState((current) => moveSelectedScene(current, 'down'));
+              updateEditor((current) => moveSelectedScene(current, 'down'));
             }}
             onMoveUp={() => {
-              setEditorState((current) => moveSelectedScene(current, 'up'));
+              updateEditor((current) => moveSelectedScene(current, 'up'));
             }}
             onSelect={(sceneId) => {
-              setEditorState((current) => selectScene(current, sceneId));
+              updateEditor((current) => selectScene(current, sceneId));
             }}
           />
         </aside>
@@ -171,23 +225,25 @@ function LoadedProjectEditor({ project }: { project: ProjectDto }) {
           <SceneInspector
             key={editorState.selectedSceneId}
             state={editorState}
-            onChange={setEditorState}
+            onChange={(state) => {
+              updateEditor(() => state);
+            }}
           />
 
-          <section className="mt-4 rounded-2xl border border-sky-400/15 bg-sky-400/[0.055] p-4">
-            <p className="text-xs font-semibold text-sky-200">Bản nháp cục bộ</p>
-            <p className="mt-1.5 text-xs leading-5 text-slate-400">
-              Thay đổi trong commit này chỉ cập nhật Player. Lưu tự động sẽ được nối ở bước
-              autosave.
-            </p>
-          </section>
+          <AutosaveStatus autosave={autosave} />
         </aside>
       </div>
     </main>
   );
 }
 
-export function ProjectEditor({ projectId }: { projectId: string }) {
+export function ProjectEditor({
+  projectId,
+  autoSaveDelayMs = 800,
+}: {
+  projectId: string;
+  autoSaveDelayMs?: number;
+}) {
   const projectQuery = useQuery({
     queryKey: ['project', projectId],
     queryFn: ({ signal }) => fetchProject(projectId, signal),
@@ -239,6 +295,7 @@ export function ProjectEditor({ projectId }: { projectId: string }) {
     <LoadedProjectEditor
       key={`${projectQuery.data.id}:${projectQuery.data.draftVersion}`}
       project={projectQuery.data}
+      autoSaveDelayMs={autoSaveDelayMs}
     />
   );
 }

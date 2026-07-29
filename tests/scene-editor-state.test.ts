@@ -2,12 +2,15 @@ import { describe, expect, it } from 'vitest';
 import { PROJECT_SCENE_TYPES } from '../packages/project-schema/src/index.js';
 import {
   addScene,
+  createSceneEditorDraftState,
   createSceneEditorState,
   deleteSelectedScene,
   duplicateSelectedScene,
   getSelectedScene,
   moveSelectedScene,
+  replaceSceneEditorDraft,
   selectScene,
+  updateSceneEditorDraft,
   updateSelectedScene,
 } from '../apps/web/src/projects/editor-state.js';
 import { STUDIO_PROJECT_FIXTURE } from '../packages/video/src/fixture.js';
@@ -206,5 +209,37 @@ describe('project scene editor state', () => {
       },
     });
     expect(getSelectedScene(state).durationInFrames).toBe(90);
+  });
+
+  it('marks document edits dirty without autosaving scene selection', () => {
+    const draft = createSceneEditorDraftState(structuredClone(STUDIO_PROJECT_FIXTURE));
+    const secondSceneId = draft.editor.document.scenes[1]!.id;
+    const selected = updateSceneEditorDraft(draft, (state) => selectScene(state, secondSceneId));
+    const edited = updateSceneEditorDraft(selected, (state) => {
+      const result = updateSelectedScene(state, (scene) => ({
+        ...scene,
+        name: 'Scene đã chỉnh sửa',
+      }));
+
+      return result.success ? result.state : state;
+    });
+
+    expect(selected.changeSequence).toBe(0);
+    expect(selected.editor.selectedSceneId).toBe(secondSceneId);
+    expect(edited.changeSequence).toBe(1);
+    expect(getSelectedScene(edited.editor).name).toBe('Scene đã chỉnh sửa');
+  });
+
+  it('replaces a conflicted draft without marking the remote document dirty', () => {
+    const draft = createSceneEditorDraftState(structuredClone(STUDIO_PROJECT_FIXTURE));
+    const secondSceneId = draft.editor.document.scenes[1]!.id;
+    const selected = updateSceneEditorDraft(draft, (state) => selectScene(state, secondSceneId));
+    const remoteDocument = structuredClone(STUDIO_PROJECT_FIXTURE);
+    remoteDocument.scenes[1]!.name = 'Tên từ máy chủ';
+    const replaced = replaceSceneEditorDraft(selected, remoteDocument);
+
+    expect(replaced.changeSequence).toBe(0);
+    expect(replaced.editor.selectedSceneId).toBe(secondSceneId);
+    expect(getSelectedScene(replaced.editor).name).toBe('Tên từ máy chủ');
   });
 });

@@ -72,6 +72,29 @@ export async function fetchProject(projectId: string, signal?: AbortSignal): Pro
   return (await response.json()) as ProjectDto;
 }
 
+export async function saveProjectDraft(
+  projectId: string,
+  expectedDraftVersion: number,
+  document: ProjectDocumentV1,
+): Promise<ProjectDto> {
+  const response = await fetch(`/api/v1/projects/${encodeURIComponent(projectId)}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      expectedDraftVersion,
+      document,
+    }),
+  });
+
+  if (!response.ok) {
+    throw await toApiError(response);
+  }
+
+  return (await response.json()) as ProjectDto;
+}
+
 export function getPreviewScene(document: ProjectDocumentV1): SceneV1 {
   const scene = document.scenes.find((candidate) => candidate.enabled);
 
