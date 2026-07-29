@@ -53,6 +53,9 @@ importers:
       '@hansys/template-registry':
         specifier: workspace:*
         version: link:../../packages/template-registry
+      '@hansys/video':
+        specifier: workspace:*
+        version: link:../../packages/video
       '@remotion/player':
         specifier: 4.0.499
         version: 4.0.499(react-dom@19.2.8(react@19.2.8))(react@19.2.8)

@@ -17,6 +17,13 @@ export default defineConfig({
       name: 'chromium',
       use: {
         ...devices['Desktop Chrome'],
+        ...(process.env.PLAYWRIGHT_BROWSER_EXECUTABLE === undefined
+          ? {}
+          : {
+              launchOptions: {
+                executablePath: process.env.PLAYWRIGHT_BROWSER_EXECUTABLE,
+              },
+            }),
       },
     },
   ],

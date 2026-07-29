@@ -16,6 +16,7 @@
     "@hansys/shared": "workspace:*",
     "@hansys/storage": "workspace:*",
     "@hansys/template-registry": "workspace:*",
+    "@hansys/video": "workspace:*",
     "@remotion/player": "4.0.499",
     "@tanstack/react-query": "5.101.4",
     "next": "16.2.12",
