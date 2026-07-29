@@ -55,4 +55,8 @@ export {
   type ProjectService,
   type ProjectSummaryResponse,
 } from './projects/service.js';
+export {
+  createTemplateCollectionHandlers,
+  type TemplatePageResponse,
+} from './templates/handlers.js';
 export { storagePaths } from './storage.js';

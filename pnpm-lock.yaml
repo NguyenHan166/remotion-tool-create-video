@@ -50,6 +50,9 @@ importers:
       '@hansys/storage':
         specifier: workspace:*
         version: link:../../packages/storage
+      '@hansys/template-registry':
+        specifier: workspace:*
+        version: link:../../packages/template-registry
       '@remotion/player':
         specifier: 4.0.499
         version: 4.0.499(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -136,7 +139,18 @@ importers:
 
   packages/storage: {}
 
-  packages/template-registry: {}
+  packages/template-registry:
+    dependencies:
+      '@hansys/project-schema':
+        specifier: workspace:*
+        version: link:../project-schema
+      react:
+        specifier: 19.2.8
+        version: 19.2.8
+    devDependencies:
+      '@types/react':
+        specifier: 19.2.17
+        version: 19.2.17
 
   packages/ui: {}
 
