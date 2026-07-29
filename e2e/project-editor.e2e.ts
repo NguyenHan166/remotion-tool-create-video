@@ -40,6 +40,38 @@ test.describe('project editor preview', () => {
     const headline = 'Tiêu đề thay đổi ngay trong Player';
     await page.getByLabel('Tiêu đề scene đang xem trước').fill(headline);
     await expect(page.getByTestId('remotion-player')).toContainText(headline);
+
+    const sceneItems = page.getByTestId('scene-list-item');
+    await expect(sceneItems).toHaveCount(2);
+    const originalIds = await sceneItems.evaluateAll((items) =>
+      items.map((item) => item.getAttribute('data-scene-id')),
+    );
+
+    await page.getByRole('button', { name: 'Chọn scene Nội dung' }).click();
+    await expect(page.getByLabel('Tiêu đề scene đang xem trước')).toHaveValue(
+      'Một nguồn dữ liệu cho cả xem trước và kết xuất',
+    );
+    await page.getByRole('button', { name: 'Di chuyển scene lên' }).click();
+    await expect
+      .poll(() =>
+        sceneItems.evaluateAll((items) => items.map((item) => item.getAttribute('data-scene-id'))),
+      )
+      .toEqual([originalIds[1], originalIds[0]]);
+
+    await page.getByRole('button', { name: 'Nhân bản scene' }).click();
+    await expect(sceneItems).toHaveCount(3);
+    const duplicatedIds = await sceneItems.evaluateAll((items) =>
+      items.map((item) => item.getAttribute('data-scene-id')),
+    );
+    expect(duplicatedIds[0]).toBe(originalIds[1]);
+    expect(duplicatedIds[1]).not.toBe(originalIds[0]);
+    expect(duplicatedIds[1]).not.toBe(originalIds[1]);
+
+    await page.getByRole('button', { name: 'Thêm scene' }).click();
+    await expect(sceneItems).toHaveCount(4);
+    await expect(page.getByRole('heading', { name: 'Scene 4' })).toBeVisible();
+    await page.getByRole('button', { name: 'Xóa scene' }).click();
+    await expect(sceneItems).toHaveCount(3);
     expect(renderRequests).toEqual([]);
   });
 

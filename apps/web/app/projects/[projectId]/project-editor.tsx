@@ -9,11 +9,20 @@ import {
   ProjectApiError,
   createPreviewProps,
   fetchProject,
-  getPreviewScene,
   getResponsivePlayerMaxWidth,
-  updateSceneHeadline,
   type ProjectDto,
 } from '../../../src/projects/client';
+import {
+  addScene,
+  createSceneEditorState,
+  deleteSelectedScene,
+  duplicateSelectedScene,
+  getSelectedScene,
+  moveSelectedScene,
+  selectScene,
+  updateSelectedSceneHeadline,
+} from '../../../src/projects/editor-state';
+import { SceneList } from './scene-list';
 
 function projectErrorMessage(error: unknown): string {
   if (error instanceof ProjectApiError) {
@@ -50,8 +59,11 @@ function PreviewError({ error }: { error: Error }) {
 }
 
 function LoadedProjectEditor({ project }: { project: ProjectDto }) {
-  const [draft, setDraft] = useState(() => structuredClone(project.document));
-  const previewScene = getPreviewScene(draft);
+  const [editorState, setEditorState] = useState(() =>
+    createSceneEditorState(structuredClone(project.document)),
+  );
+  const draft = editorState.document;
+  const selectedScene = getSelectedScene(editorState);
   const durationInFrames = getTotalDurationInFrames(draft);
   const inputProps = useMemo(() => createPreviewProps(draft), [draft]);
   const maximumPlayerWidth = getResponsivePlayerMaxWidth(
@@ -85,7 +97,32 @@ function LoadedProjectEditor({ project }: { project: ProjectDto }) {
         </div>
       </header>
 
-      <div className="mx-auto grid max-w-[1680px] gap-6 px-5 py-6 sm:px-8 lg:py-8 xl:grid-cols-[minmax(0,1fr)_360px]">
+      <div className="mx-auto grid max-w-[1680px] gap-6 px-5 py-6 sm:px-8 lg:py-8 xl:grid-cols-[280px_minmax(0,1fr)_360px]">
+        <aside className="min-w-0">
+          <SceneList
+            state={editorState}
+            fps={draft.composition.fps}
+            onAdd={() => {
+              setEditorState((current) => addScene(current, crypto.randomUUID()));
+            }}
+            onDelete={() => {
+              setEditorState(deleteSelectedScene);
+            }}
+            onDuplicate={() => {
+              setEditorState((current) => duplicateSelectedScene(current, crypto.randomUUID()));
+            }}
+            onMoveDown={() => {
+              setEditorState((current) => moveSelectedScene(current, 'down'));
+            }}
+            onMoveUp={() => {
+              setEditorState((current) => moveSelectedScene(current, 'up'));
+            }}
+            onSelect={(sceneId) => {
+              setEditorState((current) => selectScene(current, sceneId));
+            }}
+          />
+        </aside>
+
         <section className="min-w-0">
           <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
             <div>
@@ -139,10 +176,10 @@ function LoadedProjectEditor({ project }: { project: ProjectDto }) {
                 <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
                   Scene đang xem
                 </p>
-                <h2 className="mt-1 text-base font-semibold text-white">{previewScene.name}</h2>
+                <h2 className="mt-1 text-base font-semibold text-white">{selectedScene.name}</h2>
               </div>
               <span className="rounded-lg border border-orange-400/20 bg-orange-400/8 px-2.5 py-1 font-mono text-[10px] uppercase tracking-wider text-orange-300">
-                {previewScene.type}
+                {selectedScene.type}
               </span>
             </div>
 
@@ -151,12 +188,12 @@ function LoadedProjectEditor({ project }: { project: ProjectDto }) {
                 Tiêu đề scene đang xem trước
               </span>
               <textarea
-                value={previewScene.text.headline ?? ''}
+                value={selectedScene.text.headline ?? ''}
                 maxLength={300}
                 rows={6}
                 onChange={(event) => {
                   const headline = event.target.value;
-                  setDraft((current) => updateSceneHeadline(current, previewScene.id, headline));
+                  setEditorState((current) => updateSelectedSceneHeadline(current, headline));
                 }}
                 className="mt-2 w-full resize-y rounded-xl border border-white/10 bg-black/20 px-3.5 py-3 text-sm leading-6 text-white outline-none transition placeholder:text-slate-600 focus:border-orange-400/50 focus:ring-3 focus:ring-orange-400/10"
                 placeholder="Nhập tiêu đề để xem Player cập nhật ngay…"
@@ -164,7 +201,7 @@ function LoadedProjectEditor({ project }: { project: ProjectDto }) {
             </label>
             <div className="mt-3 flex items-center justify-between text-[11px] text-slate-500">
               <span>Cập nhật trực tiếp, không render MP4</span>
-              <span>{previewScene.text.headline?.length ?? 0}/300</span>
+              <span>{selectedScene.text.headline?.length ?? 0}/300</span>
             </div>
           </section>
 
