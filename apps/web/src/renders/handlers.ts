@@ -147,7 +147,7 @@ function handleRenderServiceError(request: Request, error: unknown): Response {
       request,
       409,
       error.code,
-      `Render job cannot be cancelled from ${error.currentStatus}.`,
+      `Render job cannot transition from ${error.currentStatus} to ${error.nextStatus}.`,
     );
   }
 
@@ -265,6 +265,33 @@ export function createRenderCancellationHandlers(service: RenderService): {
 
       try {
         return Response.json(await service.cancel(renderIdResult.data));
+      } catch (error) {
+        return handleRenderServiceError(request, error);
+      }
+    },
+  };
+}
+
+export function createRenderRetryHandlers(service: RenderService): {
+  POST: (request: Request, context: RenderResourceRouteContext) => Promise<Response>;
+} {
+  return {
+    POST: async (request, context) => {
+      const { renderId } = await context.params;
+      const renderIdResult = renderIdSchema.safeParse(renderId);
+
+      if (!renderIdResult.success) {
+        return createErrorResponse(
+          request,
+          400,
+          'BAD_REQUEST',
+          'Render ID is invalid.',
+          formatZodIssues(renderIdResult.error),
+        );
+      }
+
+      try {
+        return Response.json(await service.retry(renderIdResult.data));
       } catch (error) {
         return handleRenderServiceError(request, error);
       }

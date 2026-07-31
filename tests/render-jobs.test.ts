@@ -13,6 +13,7 @@ import {
   createRenderCollectionHandlers,
   createRenderCancellationHandlers,
   createRenderResourceHandlers,
+  createRenderRetryHandlers,
 } from '../apps/web/src/renders/handlers.js';
 import { DefaultRenderService } from '../apps/web/src/renders/service.js';
 
@@ -157,6 +158,36 @@ class MemoryRenderJobRepository implements RenderJobRepository {
     assertRenderStatusTransition(id, job.status, 'CANCELLED');
     job.status = 'CANCELLED';
     job.finishedAt = timestamp;
+    return job;
+  }
+
+  async recordFailure(): Promise<never> {
+    throw new Error('Not implemented by this API test repository.');
+  }
+
+  async retry(id: string): Promise<RenderJobRecord> {
+    const job = await this.findById(id);
+
+    if (job === null) {
+      throw new RenderJobNotFoundError(id);
+    }
+
+    assertRenderStatusTransition(id, job.status, 'QUEUED');
+    job.status = 'QUEUED';
+    job.progress = 0;
+    job.renderedFrames = null;
+    job.encodedFrames = null;
+    job.totalFrames = null;
+    job.stageMessage = 'Manual retry queued.';
+    job.workerId = null;
+    job.maxAttempts = Math.max(job.maxAttempts, job.attempt + 1);
+    job.errorCode = null;
+    job.errorMessage = null;
+    job.technicalError = null;
+    job.availableAt = timestamp;
+    job.heartbeatAt = null;
+    job.startedAt = null;
+    job.finishedAt = null;
     return job;
   }
 
@@ -412,6 +443,75 @@ describe('POST /renders/:renderId/cancel', () => {
     expect(response.status).toBe(404);
     await expect(response.json()).resolves.toMatchObject({
       error: { code: 'RENDER_NOT_FOUND' },
+    });
+  });
+});
+
+describe('POST /renders/:renderId/retry', () => {
+  it.each(['FAILED', 'CANCELLED'] as const)('queues a new attempt from %s', async (status) => {
+    const job = createRenderJob(status);
+    job.attempt = 2;
+    job.maxAttempts = 2;
+    job.errorCode = status === 'FAILED' ? 'BROWSER_CRASHED' : null;
+    job.errorMessage = status === 'FAILED' ? 'The browser stopped.' : null;
+    job.technicalError = status === 'FAILED' ? 'Target closed' : null;
+    const handlers = createRenderRetryHandlers(
+      new DefaultRenderService(new MemoryRenderJobRepository([job])),
+    );
+    const response = await handlers.POST(
+      new Request(`http://localhost/api/v1/renders/${renderJobId}/retry`, { method: 'POST' }),
+      { params: Promise.resolve({ renderId: renderJobId }) },
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      id: renderJobId,
+      revisionId,
+      status: 'QUEUED',
+      attempt: 2,
+      maxAttempts: 3,
+      progress: 0,
+      errorCode: null,
+      finishedAt: null,
+    });
+  });
+
+  it('rejects retry for an active job', async () => {
+    const handlers = createRenderRetryHandlers(
+      new DefaultRenderService(new MemoryRenderJobRepository([createRenderJob('RENDERING')])),
+    );
+    const response = await handlers.POST(
+      new Request(`http://localhost/api/v1/renders/${renderJobId}/retry`, { method: 'POST' }),
+      { params: Promise.resolve({ renderId: renderJobId }) },
+    );
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toMatchObject({
+      error: { code: 'RENDER_INVALID_STATE' },
+    });
+  });
+
+  it('rejects missing renders and malformed retry IDs', async () => {
+    const missingId = '55555555-5555-4555-8555-555555555555';
+    const handlers = createRenderRetryHandlers(
+      new DefaultRenderService(new MemoryRenderJobRepository([])),
+    );
+    const missing = await handlers.POST(
+      new Request(`http://localhost/api/v1/renders/${missingId}/retry`, { method: 'POST' }),
+      { params: Promise.resolve({ renderId: missingId }) },
+    );
+    const malformed = await handlers.POST(
+      new Request('http://localhost/api/v1/renders/not-a-uuid/retry', { method: 'POST' }),
+      { params: Promise.resolve({ renderId: 'not-a-uuid' }) },
+    );
+
+    expect(missing.status).toBe(404);
+    await expect(missing.json()).resolves.toMatchObject({
+      error: { code: 'RENDER_NOT_FOUND' },
+    });
+    expect(malformed.status).toBe(400);
+    await expect(malformed.json()).resolves.toMatchObject({
+      error: { code: 'BAD_REQUEST' },
     });
   });
 });

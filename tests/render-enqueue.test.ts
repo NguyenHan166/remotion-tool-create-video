@@ -106,6 +106,14 @@ class EnqueueTestRepository implements RenderJobRepository {
     throw new Error('Not implemented by enqueue test repository.');
   }
 
+  async recordFailure(): Promise<never> {
+    throw new Error('Not implemented by enqueue test repository.');
+  }
+
+  async retry(): Promise<RenderJobRecord> {
+    throw new Error('Not implemented by enqueue test repository.');
+  }
+
   async updateProgress(): Promise<void> {
     throw new Error('Not implemented by enqueue test repository.');
   }
@@ -163,7 +171,9 @@ describe('render asset readiness validation', () => {
 describe('POST /renders', () => {
   it('validates the locked draft and returns the queued job', async () => {
     const repository = new EnqueueTestRepository(createDraft());
-    const handlers = createRenderCollectionHandlers(new DefaultRenderService(repository));
+    const handlers = createRenderCollectionHandlers(
+      new DefaultRenderService(repository, { maxAttempts: 4 }),
+    );
     const response = await handlers.POST(
       createJsonRequest({
         projectId,
@@ -183,6 +193,7 @@ describe('POST /renders', () => {
     expect(repository.lastInput).toMatchObject({
       projectId,
       preset: 'vertical-h264',
+      maxAttempts: 4,
     });
   });
 

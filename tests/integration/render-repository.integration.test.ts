@@ -197,6 +197,7 @@ integrationTest('Prisma render repositories integration', () => {
       repository.enqueue({
         projectId,
         preset: 'x'.repeat(101),
+        maxAttempts: 2,
         validateDraft: () => undefined,
       }),
     ).rejects.toThrow();
@@ -268,6 +269,7 @@ integrationTest('Prisma render repositories integration', () => {
     const job = await repository.enqueue({
       projectId,
       preset: 'vertical-h264',
+      maxAttempts: 2,
       validateDraft: () => undefined,
     });
 
@@ -564,6 +566,109 @@ integrationTest('Prisma render repositories integration', () => {
       status: 'CANCELLED',
       workerId: 'worker-a',
       finishedAt: expect.any(Date),
+    });
+  });
+
+  it('automatically retries transient failures and manually retries exhausted jobs', async () => {
+    const projectId = randomUUID();
+    const revisionId = randomUUID();
+    const renderJobId = randomUUID();
+    const failedAt = new Date();
+    createdProjectIds.push(projectId);
+
+    await database.project.create({
+      data: {
+        id: projectId,
+        name: 'Render failure retry integration',
+        draftDocument: {},
+        revisions: {
+          create: {
+            id: revisionId,
+            revisionNumber: 1,
+            schemaVersion: 1,
+            templateId: 'news-clean-v1',
+            templateVersion: 1,
+            contentHash: '1'.repeat(64),
+            document: {},
+          },
+        },
+      },
+    });
+    await database.renderJob.create({
+      data: {
+        id: renderJobId,
+        projectId,
+        revisionId,
+        preset: 'vertical-h264',
+        status: 'RENDERING',
+        workerId: 'worker-a',
+        attempt: 1,
+        maxAttempts: 2,
+      },
+    });
+
+    const repository = new PrismaRenderJobRepository(database);
+    await expect(
+      repository.recordFailure({
+        renderJobId,
+        workerId: 'worker-a',
+        errorCode: 'BROWSER_CRASHED',
+        errorMessage: 'The render browser stopped unexpectedly.',
+        technicalError: 'Protocol error: Target closed',
+        transient: true,
+        failedAt,
+        retryAt: failedAt,
+      }),
+    ).resolves.toMatchObject({
+      action: 'RETRY_QUEUED',
+      job: {
+        status: 'QUEUED',
+        attempt: 1,
+        errorCode: 'BROWSER_CRASHED',
+      },
+    });
+    await expect(repository.claimNext('worker-b')).resolves.toMatchObject({
+      id: renderJobId,
+      status: 'PREPARING',
+      workerId: 'worker-b',
+      attempt: 2,
+      errorCode: null,
+      errorMessage: null,
+      technicalError: null,
+    });
+    await expect(
+      repository.recordFailure({
+        renderJobId,
+        workerId: 'worker-b',
+        errorCode: 'PROJECT_SCHEMA_INVALID',
+        errorMessage: 'The saved project revision is invalid.',
+        technicalError: 'Project document validation failed',
+        transient: false,
+        failedAt,
+      }),
+    ).resolves.toMatchObject({
+      action: 'FAILED',
+      job: {
+        status: 'FAILED',
+        attempt: 2,
+        errorCode: 'PROJECT_SCHEMA_INVALID',
+      },
+    });
+    await expect(repository.retry(renderJobId)).resolves.toMatchObject({
+      status: 'QUEUED',
+      attempt: 2,
+      maxAttempts: 3,
+      revisionId,
+      errorCode: null,
+      startedAt: null,
+      finishedAt: null,
+    });
+    await expect(repository.claimNext('worker-c')).resolves.toMatchObject({
+      id: renderJobId,
+      status: 'PREPARING',
+      workerId: 'worker-c',
+      attempt: 3,
+      revisionId,
     });
   });
 

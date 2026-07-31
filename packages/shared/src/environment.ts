@@ -13,6 +13,7 @@ const commonServerEnvironmentSchema = z.object({
   ),
   DATA_DIR: requiredString,
   LOG_LEVEL: z.enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal']).default('info'),
+  RENDER_MAX_ATTEMPTS: positiveInteger.default(2),
 });
 
 export const webServerEnvironmentSchema = commonServerEnvironmentSchema.extend({
@@ -34,7 +35,6 @@ export const workerServerEnvironmentSchema = commonServerEnvironmentSchema.exten
     .default('50%'),
   RENDER_JOB_POLL_MS: positiveInteger.default(1000),
   RENDER_STALE_AFTER_MINUTES: positiveInteger.default(30),
-  RENDER_MAX_ATTEMPTS: positiveInteger.default(2),
   WORKER_SHUTDOWN_TIMEOUT_MS: positiveInteger.default(30_000),
 });
 

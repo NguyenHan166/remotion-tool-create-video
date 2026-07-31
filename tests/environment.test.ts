@@ -48,6 +48,7 @@ describe('environment validation', () => {
       APP_URL: 'http://localhost:3000',
       MAX_UPLOAD_MB: 512,
       AUTO_SAVE_DELAY_MS: 800,
+      RENDER_MAX_ATTEMPTS: 2,
     });
   });
 

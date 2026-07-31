@@ -56,9 +56,24 @@ export type CompleteRenderCancellationInput = RenderCancellationCheckInput & {
   finishedAt?: Date;
 };
 
+export type RecordRenderFailureInput = RenderCancellationCheckInput & {
+  errorCode: string;
+  errorMessage: string;
+  technicalError: string;
+  transient: boolean;
+  failedAt?: Date;
+  retryAt?: Date;
+};
+
+export type RenderFailureDisposition = Readonly<{
+  action: 'RETRY_QUEUED' | 'FAILED';
+  job: RenderJobRecord;
+}>;
+
 export type EnqueueRenderJobInput = {
   projectId: string;
   preset: string;
+  maxAttempts: number;
   validateDraft: (document: ReturnType<typeof migrateProjectDocument>) => void;
 };
 
@@ -163,6 +178,17 @@ export class RenderJobCancellationRejectedError extends Error {
   }
 }
 
+export class RenderJobFailureRejectedError extends Error {
+  readonly code = 'RENDER_FAILURE_REJECTED';
+  readonly renderJobId: string;
+
+  constructor(renderJobId: string) {
+    super('Render failure was rejected because the job owner or state changed.');
+    this.name = 'RenderJobFailureRejectedError';
+    this.renderJobId = renderJobId;
+  }
+}
+
 export class ProjectNotRenderableError extends Error {
   readonly code = 'RENDER_INVALID_STATE';
   readonly projectId: string;
@@ -228,6 +254,8 @@ export interface RenderJobRepository {
   requestCancellation(renderJobId: string): Promise<RenderJobRecord>;
   isCancellationRequested(input: RenderCancellationCheckInput): Promise<boolean>;
   completeCancellation(input: CompleteRenderCancellationInput): Promise<RenderJobRecord>;
+  recordFailure(input: RecordRenderFailureInput): Promise<RenderFailureDisposition>;
+  retry(renderJobId: string): Promise<RenderJobRecord>;
   updateProgress(input: UpdateRenderJobProgressInput): Promise<void>;
   findById(renderJobId: string): Promise<RenderJobRecord | null>;
   list(input: ListRenderJobsInput): Promise<RenderJobRecordPage>;
@@ -258,8 +286,13 @@ export class PrismaRenderJobRepository implements RenderJobRepository {
   async enqueue({
     projectId,
     preset,
+    maxAttempts,
     validateDraft,
   }: EnqueueRenderJobInput): Promise<RenderJobRecord> {
+    if (!Number.isSafeInteger(maxAttempts) || maxAttempts <= 0) {
+      throw new RangeError('Maximum render attempts must be a positive safe integer.');
+    }
+
     return this.#database.$transaction(async (transaction) => {
       const lockedProjects = await transaction.$queryRaw<Array<{ id: string }>>(
         Prisma.sql`
@@ -341,6 +374,7 @@ export class PrismaRenderJobRepository implements RenderJobRepository {
           projectId,
           revisionId: revision.id,
           preset,
+          maxAttempts,
         },
         include: renderJobWithOutputs,
       });
@@ -368,8 +402,17 @@ export class PrismaRenderJobRepository implements RenderJobRepository {
             "status" = 'PREPARING'::"RenderStatus",
             "workerId" = ${workerId},
             "attempt" = job."attempt" + 1,
+            "progress" = 0,
+            "renderedFrames" = NULL,
+            "encodedFrames" = NULL,
+            "totalFrames" = NULL,
+            "stageMessage" = 'Preparing render.',
             "startedAt" = COALESCE(job."startedAt", NOW()),
             "heartbeatAt" = NOW(),
+            "finishedAt" = NULL,
+            "errorCode" = NULL,
+            "errorMessage" = NULL,
+            "technicalError" = NULL,
             "updatedAt" = NOW()
           FROM "claimableJob"
           WHERE job."id" = "claimableJob"."id"
@@ -592,6 +635,150 @@ export class PrismaRenderJobRepository implements RenderJobRepository {
     return this.#database.renderJob.findUniqueOrThrow({
       where: { id: renderJobId },
       include: renderJobWithOutputs,
+    });
+  }
+
+  async recordFailure({
+    renderJobId,
+    workerId,
+    errorCode,
+    errorMessage,
+    technicalError,
+    transient,
+    failedAt = new Date(),
+    retryAt = failedAt,
+  }: RecordRenderFailureInput): Promise<RenderFailureDisposition> {
+    assertRenderWorkerId(workerId);
+
+    if (!/^[A-Z][A-Z0-9_]{0,99}$/.test(errorCode)) {
+      throw new RangeError('Render error code must use 1 to 100 uppercase identifier characters.');
+    }
+
+    if (errorMessage.trim().length === 0 || errorMessage.length > 2_000) {
+      throw new RangeError('Render error message must contain 1 to 2000 characters.');
+    }
+
+    if (technicalError.trim().length === 0 || technicalError.length > 4_000) {
+      throw new RangeError('Technical render error must contain 1 to 4000 characters.');
+    }
+
+    if (Number.isNaN(failedAt.getTime()) || Number.isNaN(retryAt.getTime()) || retryAt < failedAt) {
+      throw new RangeError(
+        'Render failure timestamps must be valid and retry must not be earlier.',
+      );
+    }
+
+    return this.#database.$transaction(async (transaction) => {
+      const jobs = await transaction.$queryRaw<
+        Array<{
+          status: RenderStatus;
+          workerId: string | null;
+          attempt: number;
+          maxAttempts: number;
+        }>
+      >(
+        Prisma.sql`
+          SELECT status, "workerId", attempt, "maxAttempts"
+          FROM "RenderJob"
+          WHERE id = ${renderJobId}::uuid
+          FOR UPDATE
+        `,
+      );
+      const job = jobs[0];
+      const activeStatuses: readonly RenderStatus[] = [
+        'PREPARING',
+        'BUNDLING',
+        'RENDERING',
+        'ENCODING',
+      ];
+
+      if (job === undefined) {
+        throw new RenderJobNotFoundError(renderJobId);
+      }
+
+      if (job.workerId !== workerId || !activeStatuses.includes(job.status)) {
+        throw new RenderJobFailureRejectedError(renderJobId);
+      }
+
+      const shouldRetry = transient && job.attempt < job.maxAttempts;
+      const updated = await transaction.renderJob.update({
+        where: { id: renderJobId },
+        data: shouldRetry
+          ? {
+              status: 'QUEUED',
+              progress: 0,
+              renderedFrames: null,
+              encodedFrames: null,
+              totalFrames: null,
+              stageMessage: `Retry queued after ${errorCode}.`,
+              workerId: null,
+              availableAt: retryAt,
+              heartbeatAt: null,
+              finishedAt: null,
+              errorCode,
+              errorMessage,
+              technicalError,
+            }
+          : {
+              status: 'FAILED',
+              stageMessage: 'Render failed.',
+              heartbeatAt: failedAt,
+              finishedAt: failedAt,
+              errorCode,
+              errorMessage,
+              technicalError,
+            },
+        include: renderJobWithOutputs,
+      });
+
+      return {
+        action: shouldRetry ? 'RETRY_QUEUED' : 'FAILED',
+        job: updated,
+      };
+    });
+  }
+
+  async retry(renderJobId: string): Promise<RenderJobRecord> {
+    return this.#database.$transaction(async (transaction) => {
+      const jobs = await transaction.$queryRaw<
+        Array<{ status: RenderStatus; attempt: number; maxAttempts: number }>
+      >(
+        Prisma.sql`
+          SELECT status, attempt, "maxAttempts"
+          FROM "RenderJob"
+          WHERE id = ${renderJobId}::uuid
+          FOR UPDATE
+        `,
+      );
+      const job = jobs[0];
+
+      if (job === undefined) {
+        throw new RenderJobNotFoundError(renderJobId);
+      }
+
+      assertRenderStatusTransition(renderJobId, job.status, 'QUEUED');
+
+      return transaction.renderJob.update({
+        where: { id: renderJobId },
+        data: {
+          status: 'QUEUED',
+          progress: 0,
+          renderedFrames: null,
+          encodedFrames: null,
+          totalFrames: null,
+          stageMessage: 'Manual retry queued.',
+          workerId: null,
+          maxAttempts: Math.max(job.maxAttempts, job.attempt + 1),
+          errorCode: null,
+          errorMessage: null,
+          technicalError: null,
+          availableAt: new Date(),
+          heartbeatAt: null,
+          startedAt: null,
+          finishedAt: null,
+        },
+        include: renderJobWithOutputs,
+      });
     });
   }
 

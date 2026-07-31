@@ -63,6 +63,7 @@ export {
   createRenderCollectionHandlers,
   createRenderCancellationHandlers,
   createRenderResourceHandlers,
+  createRenderRetryHandlers,
   type RenderResourceRouteContext,
 } from './renders/handlers.js';
 export {
@@ -70,6 +71,7 @@ export {
   RenderRecordNotFoundError,
   RenderTemplateValidationError,
   toRenderJobResponse,
+  type DefaultRenderServiceOptions,
   type RenderJobPageResponse,
   type RenderJobResponse,
   type RenderOutputResponse,

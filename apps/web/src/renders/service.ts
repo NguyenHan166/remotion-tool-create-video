@@ -58,11 +58,17 @@ export type RenderJobPageResponse = {
   total: number;
 };
 
+export type DefaultRenderServiceOptions = {
+  templateRegistry?: TemplateRegistry;
+  maxAttempts?: number;
+};
+
 export interface RenderService {
   enqueue(input: CreateRenderRequest): Promise<RenderJobResponse>;
   list(input: ListRendersQuery): Promise<RenderJobPageResponse>;
   get(renderJobId: string): Promise<RenderJobResponse>;
   cancel(renderJobId: string): Promise<RenderJobResponse>;
+  retry(renderJobId: string): Promise<RenderJobResponse>;
 }
 
 export class RenderTemplateValidationError extends Error {
@@ -140,16 +146,29 @@ export function toRenderJobResponse(job: RenderJobRecord): RenderJobResponse {
 export class DefaultRenderService implements RenderService {
   readonly #repository: RenderJobRepository;
   readonly #templateRegistry: TemplateRegistry;
+  readonly #maxAttempts: number;
 
-  constructor(repository: RenderJobRepository, registry: TemplateRegistry = templateRegistry) {
+  constructor(
+    repository: RenderJobRepository,
+    {
+      templateRegistry: registry = templateRegistry,
+      maxAttempts = 2,
+    }: DefaultRenderServiceOptions = {},
+  ) {
+    if (!Number.isSafeInteger(maxAttempts) || maxAttempts <= 0) {
+      throw new RangeError('Maximum render attempts must be a positive safe integer.');
+    }
+
     this.#repository = repository;
     this.#templateRegistry = registry;
+    this.#maxAttempts = maxAttempts;
   }
 
   async enqueue(input: CreateRenderRequest): Promise<RenderJobResponse> {
     const renderJob = await this.#repository.enqueue({
       projectId: input.projectId,
       preset: input.preset,
+      maxAttempts: this.#maxAttempts,
       validateDraft: (document) => {
         const manifest = getTemplate(
           document.template.id,
@@ -196,6 +215,18 @@ export class DefaultRenderService implements RenderService {
   async cancel(renderJobId: string): Promise<RenderJobResponse> {
     try {
       return toRenderJobResponse(await this.#repository.requestCancellation(renderJobId));
+    } catch (error) {
+      if (error instanceof RenderJobNotFoundError) {
+        throw new RenderRecordNotFoundError();
+      }
+
+      throw error;
+    }
+  }
+
+  async retry(renderJobId: string): Promise<RenderJobResponse> {
+    try {
+      return toRenderJobResponse(await this.#repository.retry(renderJobId));
     } catch (error) {
       if (error instanceof RenderJobNotFoundError) {
         throw new RenderRecordNotFoundError();

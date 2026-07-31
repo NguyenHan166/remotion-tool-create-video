@@ -29,6 +29,8 @@ import {
   runRenderAttemptWithCancellation,
 } from './render-cancellation.js';
 import { selectCompositionFromRevision } from './render-composition.js';
+import { RenderPipelineError, classifyRenderFailure } from './render-errors.js';
+import { persistRenderFailure } from './render-failure-runtime.js';
 import { renderH264Media } from './render-media.js';
 import { storagePaths } from './storage.js';
 
@@ -123,15 +125,66 @@ export const workerLifecycle = new WorkerLifecycle({
           job,
           loadRevision: (revisionId) => renderRevisionRepository.findById(revisionId),
           verifyAsset: async (asset) => {
-            const file = await stat(resolveStoredAssetPath(storagePaths, asset.relativePath));
+            let file: Awaited<ReturnType<typeof stat>>;
+
+            try {
+              file = await stat(resolveStoredAssetPath(storagePaths, asset.relativePath));
+            } catch (cause) {
+              throw new RenderPipelineError(
+                'ASSET_FILE_MISSING',
+                `Render asset ${asset.id} could not be read.`,
+                { cause },
+              );
+            }
 
             if (!file.isFile() || file.size <= 0) {
-              throw new Error(`Render asset ${asset.id} is missing or empty.`);
+              throw new RenderPipelineError(
+                'ASSET_FILE_MISSING',
+                `Render asset ${asset.id} is missing or empty.`,
+              );
             }
           },
           createAssetScope: (assets) => workerAssetServer.createScope(assets),
-          getBundle: getOrCreateRemotionBundle,
-          select: selectComposition,
+          getBundle: async () => {
+            try {
+              return await getOrCreateRemotionBundle();
+            } catch (cause) {
+              const failure = classifyRenderFailure(cause);
+
+              if (failure.transient || failure.code === 'STORAGE_FULL') {
+                throw new RenderPipelineError(failure.code, failure.technicalError, {
+                  cause,
+                  transient: failure.transient,
+                });
+              }
+
+              throw new RenderPipelineError(
+                'BUNDLE_FAILED',
+                'The Remotion bundle could not be built or loaded.',
+                { cause },
+              );
+            }
+          },
+          select: async (options) => {
+            try {
+              return await selectComposition(options);
+            } catch (cause) {
+              const failure = classifyRenderFailure(cause);
+
+              if (failure.code === 'BROWSER_CRASHED') {
+                throw new RenderPipelineError(failure.code, failure.technicalError, {
+                  cause,
+                  transient: true,
+                });
+              }
+
+              throw new RenderPipelineError(
+                'COMPOSITION_SELECT_FAILED',
+                'Remotion could not select the project composition.',
+                { cause },
+              );
+            }
+          },
           onStage: async (stage) => {
             await cancellationMonitor.check();
             await renderJobRepository.updateProgress({
@@ -196,11 +249,17 @@ export const workerLifecycle = new WorkerLifecycle({
     console.error('Worker queue polling failed', error);
   },
   onJobError: async (job, error) => {
-    console.error(`Render job ${job.id} failed before execution`, error);
-    await renderJobRepository.transitionStatus({
-      renderJobId: job.id,
-      nextStatus: 'FAILED',
+    const { failure, disposition } = await persistRenderFailure({
+      job,
+      workerId,
+      error,
+      recordFailure: (input) => renderJobRepository.recordFailure(input),
     });
+    console.error(
+      `Render job ${job.id} ${disposition.action === 'RETRY_QUEUED' ? 'will retry' : 'failed'} ` +
+        `with ${failure.code}.`,
+      error,
+    );
   },
   onHeartbeatError: (error) => {
     console.error('Failed to publish worker heartbeat', error);
