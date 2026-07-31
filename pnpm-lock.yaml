@@ -99,6 +99,9 @@ importers:
       '@hansys/storage':
         specifier: workspace:*
         version: link:../../packages/storage
+      '@hansys/video':
+        specifier: workspace:*
+        version: link:../../packages/video
       '@remotion/bundler':
         specifier: 4.0.499
         version: 4.0.499(@swc/helpers@0.5.15)(postcss@8.5.23)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)

@@ -1,12 +1,4 @@
 import { Config } from '@remotion/cli/config';
+import { overrideVideoWebpackConfig } from './src/bundler-config.js';
 
-Config.overrideWebpackConfig((configuration) => ({
-  ...configuration,
-  resolve: {
-    ...configuration.resolve,
-    extensionAlias: {
-      ...configuration.resolve?.extensionAlias,
-      '.js': ['.ts', '.tsx', '.js'],
-    },
-  },
-}));
+Config.overrideWebpackConfig(overrideVideoWebpackConfig);

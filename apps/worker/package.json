@@ -12,6 +12,7 @@
     "@hansys/database": "workspace:*",
     "@hansys/shared": "workspace:*",
     "@hansys/storage": "workspace:*",
+    "@hansys/video": "workspace:*",
     "@remotion/bundler": "4.0.499",
     "@remotion/renderer": "4.0.499",
     "tsx": "^4.23.1"

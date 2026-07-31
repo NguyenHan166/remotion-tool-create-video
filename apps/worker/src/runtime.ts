@@ -1,7 +1,12 @@
 import { createRequire } from 'node:module';
 import { hostname } from 'node:os';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { Prisma, PrismaRenderJobRepository } from '@hansys/database';
 import { assertStorageWritable, removeRenderJobTempDirectory } from '@hansys/storage';
+import { overrideVideoWebpackConfig } from '@hansys/video/bundler-config';
+import { bundle } from '@remotion/bundler';
+import { PersistentRemotionBundleCache, computeRemotionBundleKey } from './bundle-cache.js';
 import { database } from './database.js';
 import { checkCommandAvailable, checkRemotionBrowser, runWorkerDoctor } from './doctor.js';
 import { workerServerEnvironment } from './environment.js';
@@ -12,6 +17,35 @@ import { storagePaths } from './storage.js';
 const require = createRequire(import.meta.url);
 const rendererManifest = require('@remotion/renderer/package.json') as { version: string };
 const renderJobRepository = new PrismaRenderJobRepository(database);
+const workspaceRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
+
+export const remotionBundleCache = new PersistentRemotionBundleCache({
+  cacheDirectory: storagePaths.bundles,
+  buildBundle: async (outputDirectory) => {
+    await bundle({
+      entryPoint: resolve(workspaceRoot, 'packages/video/src/index.ts'),
+      outDir: outputDirectory,
+      rootDir: resolve(workspaceRoot, 'packages/video'),
+      webpackOverride: overrideVideoWebpackConfig,
+    });
+  },
+});
+
+export async function getOrCreateRemotionBundle(): Promise<{
+  bundleKey: string;
+  serveUrl: string;
+}> {
+  const bundleKey = await computeRemotionBundleKey({
+    workspaceRoot,
+    remotionVersion: rendererManifest.version,
+    buildMode: 'production',
+  });
+
+  return {
+    bundleKey,
+    serveUrl: await remotionBundleCache.getOrCreate(bundleKey),
+  };
+}
 
 export const workerId = `${hostname()}:${process.pid}`;
 

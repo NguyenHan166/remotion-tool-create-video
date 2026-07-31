@@ -6,6 +6,16 @@ export {
 } from './heartbeat.js';
 export { createPrismaWorkerHeartbeatWriter } from './heartbeat-runtime.js';
 export {
+  BUNDLE_CACHE_MANIFEST_FILE,
+  BUNDLE_CACHE_SCHEMA_VERSION,
+  DEFAULT_BUNDLE_LOCK_POLL_INTERVAL_MS,
+  DEFAULT_BUNDLE_LOCK_STALE_AFTER_MS,
+  PersistentRemotionBundleCache,
+  computeRemotionBundleKey,
+  type PersistentRemotionBundleCacheOptions,
+  type RemotionBundleKeyInput,
+} from './bundle-cache.js';
+export {
   WorkerDoctorError,
   assertWorkerDoctorHealthy,
   checkCommandAvailable,

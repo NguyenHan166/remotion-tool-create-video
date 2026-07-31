@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     ".": "./src/project-video.tsx",
+    "./bundler-config": "./src/bundler-config.ts",
     "./fixture": "./src/fixture.ts",
     "./root": "./src/root.tsx",
     "./templates/news-clean-v1": "./src/templates/news-clean-v1/index.ts"
