@@ -35,6 +35,7 @@ export const workerServerEnvironmentSchema = commonServerEnvironmentSchema.exten
   RENDER_JOB_POLL_MS: positiveInteger.default(1000),
   RENDER_STALE_AFTER_MINUTES: positiveInteger.default(30),
   RENDER_MAX_ATTEMPTS: positiveInteger.default(2),
+  WORKER_SHUTDOWN_TIMEOUT_MS: positiveInteger.default(30_000),
 });
 
 export const clientEnvironmentSchema = z.object({

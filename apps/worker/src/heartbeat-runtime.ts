@@ -1,33 +1,8 @@
-import { hostname } from 'node:os';
-import { createRequire } from 'node:module';
-import { Prisma } from '@hansys/database';
-import { database } from './database.js';
-import { workerServerEnvironment } from './environment.js';
-import { WorkerHeartbeatLoop, type WorkerHeartbeatPayload } from './heartbeat.js';
-import './storage.js';
+import { Prisma, type PrismaClient } from '@hansys/database';
+import { type WorkerHeartbeatPayload, type WorkerHeartbeatWriter } from './heartbeat.js';
 
-const require = createRequire(import.meta.url);
-const rendererManifest = require('@remotion/renderer/package.json') as { version: string };
-
-function createHeartbeatPayload(): WorkerHeartbeatPayload {
-  return {
-    workerId: `${hostname()}:${process.pid}`,
-    appVersion: workerServerEnvironment.APP_VERSION,
-    remotionVersion: rendererManifest.version,
-    status: 'IDLE',
-    currentJobId: null,
-    ffmpegAvailable: false,
-    browserAvailable: false,
-    storageWritable: true,
-    details: {
-      capabilityChecks: 'pending-environment-doctor',
-    },
-  };
-}
-
-export const workerHeartbeatLoop = new WorkerHeartbeatLoop({
-  createPayload: createHeartbeatPayload,
-  writeHeartbeat: async (heartbeat) => {
+export function createPrismaWorkerHeartbeatWriter(database: PrismaClient): WorkerHeartbeatWriter {
+  return async (heartbeat: WorkerHeartbeatPayload) => {
     const data = {
       appVersion: heartbeat.appVersion,
       remotionVersion: heartbeat.remotionVersion,
@@ -49,10 +24,5 @@ export const workerHeartbeatLoop = new WorkerHeartbeatLoop({
       },
       update: data,
     });
-  },
-  onError: (error) => {
-    console.error('Failed to publish worker heartbeat', error);
-  },
-});
-
-await workerHeartbeatLoop.start();
+  };
+}

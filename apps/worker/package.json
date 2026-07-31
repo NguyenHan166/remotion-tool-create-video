@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "start": "tsx src/main.ts",
     "lint": "eslint src --max-warnings=0",
     "typecheck": "tsc --project tsconfig.json --noEmit"
   },
@@ -12,6 +13,7 @@
     "@hansys/shared": "workspace:*",
     "@hansys/storage": "workspace:*",
     "@remotion/bundler": "4.0.499",
-    "@remotion/renderer": "4.0.499"
+    "@remotion/renderer": "4.0.499",
+    "tsx": "^4.23.1"
   }
 }

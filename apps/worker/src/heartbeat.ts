@@ -59,13 +59,17 @@ export class WorkerHeartbeatLoop {
     this.#running = true;
 
     try {
-      await this.#writeHeartbeat(this.#createPayload());
+      await this.publishNow();
     } catch (error) {
       this.#running = false;
       throw error;
     }
 
     this.#scheduleNextHeartbeat();
+  }
+
+  async publishNow(): Promise<void> {
+    await this.#writeHeartbeat(this.#createPayload());
   }
 
   stop(): void {

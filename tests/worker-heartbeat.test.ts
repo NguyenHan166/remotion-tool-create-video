@@ -38,6 +38,10 @@ describe('worker heartbeat loop', () => {
     await vi.advanceTimersByTimeAsync(2_000);
 
     expect(writeHeartbeat).toHaveBeenCalledTimes(3);
+
+    await loop.publishNow();
+
+    expect(writeHeartbeat).toHaveBeenCalledTimes(4);
     loop.stop();
   });
 
