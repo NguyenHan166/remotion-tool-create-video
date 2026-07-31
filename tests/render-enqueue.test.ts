@@ -90,6 +90,10 @@ class EnqueueTestRepository implements RenderJobRepository {
     return null;
   }
 
+  async recoverStale() {
+    return { retriedJobIds: [], failedJobIds: [] };
+  }
+
   async findById(): Promise<RenderJobRecord | null> {
     return null;
   }

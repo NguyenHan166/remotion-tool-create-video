@@ -55,11 +55,13 @@ export {
   type CreateRenderOutputInput,
   type EnqueueRenderJobInput,
   type ListRenderJobsInput,
+  type RecoverStaleRenderJobsInput,
   type RenderAssetState,
   type RenderJobRecord,
   type RenderJobRecordPage,
   type RenderJobRepository,
   type RenderOutputRepository,
+  type StaleRenderRecoveryResult,
   type TransitionRenderJobInput,
 } from './render-repository.js';
 

@@ -159,12 +159,14 @@ describe('worker environment doctor', () => {
 describe('worker lifecycle', () => {
   it('starts independently, publishes capabilities and polls the queue', async () => {
     const claimNext = vi.fn().mockResolvedValue(null);
-    const { lifecycle, heartbeats, cleanup } = createLifecycle({ claimNext });
+    const recoverStaleJobs = vi.fn().mockResolvedValue(undefined);
+    const { lifecycle, heartbeats, cleanup } = createLifecycle({ claimNext, recoverStaleJobs });
 
     await lifecycle.start();
     await flushUntil(() => claimNext.mock.calls.length > 0);
 
     expect(lifecycle.state).toBe('RUNNING');
+    expect(recoverStaleJobs).toHaveBeenCalledOnce();
     expect(claimNext).toHaveBeenCalledWith('worker-test');
     expect(heartbeats[0]).toMatchObject({
       workerId: 'worker-test',
@@ -182,6 +184,66 @@ describe('worker lifecycle', () => {
     await lifecycle.shutdown();
 
     expect(lifecycle.state).toBe('STOPPED');
+    expect(cleanup).toHaveBeenCalledOnce();
+  });
+
+  it('recovers stale jobs after doctor checks and before heartbeat or polling', async () => {
+    const events: string[] = [];
+    const { lifecycle } = createLifecycle({
+      runDoctor: async () => {
+        events.push('doctor');
+        return createHealthyDoctorReport();
+      },
+      recoverStaleJobs: async () => {
+        events.push('recover');
+      },
+      writeHeartbeat: async () => {
+        events.push('heartbeat');
+      },
+      claimNext: async () => {
+        events.push('claim');
+        return null;
+      },
+    });
+
+    await lifecycle.start();
+    await flushUntil(() => events.includes('claim'));
+
+    expect(events.slice(0, 4)).toEqual(['doctor', 'recover', 'heartbeat', 'claim']);
+    await lifecycle.shutdown();
+  });
+
+  it('runs stale recovery periodically while polling', async () => {
+    vi.useFakeTimers();
+    const recoverStaleJobs = vi.fn().mockResolvedValue(undefined);
+    const { lifecycle } = createLifecycle({
+      pollIntervalMs: 25,
+      staleRecoveryIntervalMs: 100,
+      recoverStaleJobs,
+    });
+
+    await lifecycle.start();
+    expect(recoverStaleJobs).toHaveBeenCalledOnce();
+
+    await vi.advanceTimersByTimeAsync(100);
+    expect(recoverStaleJobs).toHaveBeenCalledTimes(2);
+
+    await lifecycle.shutdown();
+  });
+
+  it('does not heartbeat or poll when startup recovery fails', async () => {
+    const recoveryError = new Error('stale cleanup failed');
+    const claimNext = vi.fn().mockResolvedValue(null);
+    const { lifecycle, writeHeartbeat, cleanup } = createLifecycle({
+      recoverStaleJobs: vi.fn().mockRejectedValue(recoveryError),
+      claimNext,
+    });
+
+    await expect(lifecycle.start()).rejects.toBe(recoveryError);
+
+    expect(lifecycle.state).toBe('STOPPED');
+    expect(writeHeartbeat).not.toHaveBeenCalled();
+    expect(claimNext).not.toHaveBeenCalled();
     expect(cleanup).toHaveBeenCalledOnce();
   });
 

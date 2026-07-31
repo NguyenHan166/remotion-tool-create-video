@@ -1,7 +1,7 @@
 import { createRequire } from 'node:module';
 import { hostname } from 'node:os';
 import { Prisma, PrismaRenderJobRepository } from '@hansys/database';
-import { assertStorageWritable } from '@hansys/storage';
+import { assertStorageWritable, removeRenderJobTempDirectory } from '@hansys/storage';
 import { database } from './database.js';
 import { checkCommandAvailable, checkRemotionBrowser, runWorkerDoctor } from './doctor.js';
 import { workerServerEnvironment } from './environment.js';
@@ -32,6 +32,21 @@ export const workerLifecycle = new WorkerLifecycle({
       ffprobe: () => checkCommandAvailable('ffprobe'),
       browser: checkRemotionBrowser,
     }),
+  recoverStaleJobs: async () => {
+    const staleAfterMs = workerServerEnvironment.RENDER_STALE_AFTER_MINUTES * 60_000;
+    const recovery = await renderJobRepository.recoverStale({
+      staleBefore: new Date(Date.now() - staleAfterMs),
+      cleanupAttempt: (renderJobId) => removeRenderJobTempDirectory(storagePaths, renderJobId),
+    });
+
+    if (recovery.retriedJobIds.length > 0 || recovery.failedJobIds.length > 0) {
+      console.info('Recovered stale render jobs', recovery);
+    }
+  },
+  staleRecoveryIntervalMs: Math.max(
+    60_000,
+    Math.floor((workerServerEnvironment.RENDER_STALE_AFTER_MINUTES * 60_000) / 2),
+  ),
   claimNext: (claimingWorkerId) => renderJobRepository.claimNext(claimingWorkerId),
   executeJob: async () => {
     throw new Error('Render execution pipeline is not available yet.');

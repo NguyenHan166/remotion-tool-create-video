@@ -1,4 +1,12 @@
-import { existsSync, mkdtempSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -6,6 +14,7 @@ import {
   STORAGE_DIRECTORY_NAMES,
   StoragePathError,
   initializeStorage,
+  removeRenderJobTempDirectory,
   safeJoin,
   type StorageInitializationError,
 } from '../packages/storage/src/index.js';
@@ -91,5 +100,36 @@ describe('storage bootstrap', () => {
       code: 'STORAGE_NOT_WRITABLE',
       directory: resolve(filePath),
     } satisfies Partial<StorageInitializationError>);
+  });
+});
+
+describe('render attempt cleanup', () => {
+  it('removes only the UUID-scoped temporary directory and is idempotent', async () => {
+    const parent = createTemporaryDirectory();
+    const paths = await initializeStorage(join(parent, 'data'));
+    const renderJobId = '11111111-1111-4111-8111-111111111111';
+    const attemptDirectory = join(paths.temp, renderJobId);
+    const siblingDirectory = join(paths.temp, 'keep');
+    mkdirSync(attemptDirectory, { recursive: true });
+    mkdirSync(siblingDirectory, { recursive: true });
+    writeFileSync(join(attemptDirectory, 'partial.mp4'), 'partial');
+
+    await removeRenderJobTempDirectory(paths, renderJobId);
+    await removeRenderJobTempDirectory(paths, renderJobId);
+
+    expect(existsSync(attemptDirectory)).toBe(false);
+    expect(existsSync(siblingDirectory)).toBe(true);
+  });
+
+  it('rejects an unsafe render job ID before touching storage', async () => {
+    const parent = createTemporaryDirectory();
+    const paths = await initializeStorage(join(parent, 'data'));
+    const outsidePath = join(paths.root, 'outside.txt');
+    writeFileSync(outsidePath, 'keep');
+
+    await expect(removeRenderJobTempDirectory(paths, '../outside')).rejects.toBeInstanceOf(
+      StoragePathError,
+    );
+    expect(existsSync(outsidePath)).toBe(true);
   });
 });

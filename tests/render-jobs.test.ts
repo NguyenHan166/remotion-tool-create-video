@@ -112,6 +112,10 @@ class MemoryRenderJobRepository implements RenderJobRepository {
     return null;
   }
 
+  async recoverStale() {
+    return { retriedJobIds: [], failedJobIds: [] };
+  }
+
   async findById(id: string): Promise<RenderJobRecord | null> {
     return this.jobs.find((job) => job.id === id) ?? null;
   }

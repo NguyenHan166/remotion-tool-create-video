@@ -6,6 +6,7 @@ export {
   createAssetStorageLocation,
   createStoragePaths,
   initializeStorage,
+  removeRenderJobTempDirectory,
   safeJoin,
   type StorageDirectoryKey,
   type AssetStorageLocation,

@@ -39,6 +39,17 @@ export type EnqueueRenderJobInput = {
   validateDraft: (document: ReturnType<typeof migrateProjectDocument>) => void;
 };
 
+export type RecoverStaleRenderJobsInput = {
+  staleBefore: Date;
+  recoveredAt?: Date;
+  cleanupAttempt?: (renderJobId: string) => Promise<void>;
+};
+
+export type StaleRenderRecoveryResult = {
+  retriedJobIds: string[];
+  failedJobIds: string[];
+};
+
 export type RenderAssetState = {
   id: string;
   status: AssetStatus;
@@ -168,6 +179,7 @@ export function assertRenderStatusTransition(
 export interface RenderJobRepository {
   enqueue(input: EnqueueRenderJobInput): Promise<RenderJobRecord>;
   claimNext(workerId: string): Promise<RenderJobRecord | null>;
+  recoverStale(input: RecoverStaleRenderJobsInput): Promise<StaleRenderRecoveryResult>;
   findById(renderJobId: string): Promise<RenderJobRecord | null>;
   list(input: ListRenderJobsInput): Promise<RenderJobRecordPage>;
   transitionStatus(input: TransitionRenderJobInput): Promise<RenderJobRecord>;
@@ -327,6 +339,97 @@ export class PrismaRenderJobRepository implements RenderJobRepository {
         },
         include: renderJobWithOutputs,
       });
+    });
+  }
+
+  async recoverStale({
+    staleBefore,
+    recoveredAt = new Date(),
+    cleanupAttempt = async () => undefined,
+  }: RecoverStaleRenderJobsInput): Promise<StaleRenderRecoveryResult> {
+    if (Number.isNaN(staleBefore.getTime()) || Number.isNaN(recoveredAt.getTime())) {
+      throw new RangeError('Stale recovery timestamps must be valid dates.');
+    }
+
+    return this.#database.$transaction(async (transaction) => {
+      const staleJobs = await transaction.$queryRaw<
+        Array<{
+          id: string;
+          attempt: number;
+          maxAttempts: number;
+          workerId: string | null;
+        }>
+      >(
+        Prisma.sql`
+          SELECT "id", "attempt", "maxAttempts", "workerId"
+          FROM "RenderJob"
+          WHERE "status" IN (
+            'PREPARING'::"RenderStatus",
+            'BUNDLING'::"RenderStatus",
+            'RENDERING'::"RenderStatus",
+            'ENCODING'::"RenderStatus"
+          )
+            AND "heartbeatAt" < ${staleBefore}
+          ORDER BY "heartbeatAt" ASC, "createdAt" ASC
+          FOR UPDATE SKIP LOCKED
+        `,
+      );
+
+      await Promise.all(staleJobs.map(({ id }) => cleanupAttempt(id)));
+
+      const retriedJobIds: string[] = [];
+      const failedJobIds: string[] = [];
+
+      for (const job of staleJobs) {
+        if (job.attempt < job.maxAttempts) {
+          await transaction.renderJob.update({
+            where: {
+              id: job.id,
+            },
+            data: {
+              status: 'QUEUED',
+              progress: 0,
+              renderedFrames: null,
+              encodedFrames: null,
+              totalFrames: null,
+              stageMessage: 'Recovered after worker heartbeat expired.',
+              workerId: null,
+              errorCode: null,
+              errorMessage: null,
+              technicalError: null,
+              availableAt: recoveredAt,
+              heartbeatAt: null,
+              finishedAt: null,
+            },
+          });
+          retriedJobIds.push(job.id);
+          continue;
+        }
+
+        await transaction.renderJob.update({
+          where: {
+            id: job.id,
+          },
+          data: {
+            status: 'FAILED',
+            stageMessage: 'Worker heartbeat expired.',
+            workerId: null,
+            errorCode: 'WORKER_LOST',
+            errorMessage: 'The render worker stopped responding.',
+            technicalError:
+              job.workerId === null
+                ? 'The claimed worker heartbeat expired.'
+                : `Worker ${job.workerId} heartbeat expired.`,
+            finishedAt: recoveredAt,
+          },
+        });
+        failedJobIds.push(job.id);
+      }
+
+      return {
+        retriedJobIds,
+        failedJobIds,
+      };
     });
   }
 

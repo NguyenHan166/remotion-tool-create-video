@@ -16,6 +16,7 @@ export {
   type WorkerDoctorReport,
 } from './doctor.js';
 export {
+  DEFAULT_STALE_RECOVERY_INTERVAL_MS,
   DEFAULT_WORKER_SHUTDOWN_TIMEOUT_MS,
   WorkerLifecycle,
   type WorkerExecutionContext,

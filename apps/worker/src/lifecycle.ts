@@ -8,6 +8,7 @@ import {
 import { assertWorkerDoctorHealthy, type WorkerDoctorReport } from './doctor.js';
 
 export const DEFAULT_WORKER_SHUTDOWN_TIMEOUT_MS = 30_000;
+export const DEFAULT_STALE_RECOVERY_INTERVAL_MS = 60_000;
 
 export type WorkerLifecycleState = 'CREATED' | 'STARTING' | 'RUNNING' | 'STOPPING' | 'STOPPED';
 
@@ -23,7 +24,9 @@ export type WorkerLifecycleOptions = {
   pollIntervalMs: number;
   shutdownTimeoutMs?: number;
   heartbeatIntervalMs?: number;
+  staleRecoveryIntervalMs?: number;
   runDoctor: () => Promise<WorkerDoctorReport>;
+  recoverStaleJobs?: () => Promise<void>;
   claimNext: (workerId: string) => Promise<RenderJobRecord | null>;
   executeJob: (job: RenderJobRecord, context: WorkerExecutionContext) => Promise<void>;
   writeHeartbeat: WorkerHeartbeatWriter;
@@ -52,7 +55,9 @@ export class WorkerLifecycle {
   readonly #jobConcurrency: number;
   readonly #pollIntervalMs: number;
   readonly #shutdownTimeoutMs: number;
+  readonly #staleRecoveryIntervalMs: number;
   readonly #runDoctor: () => Promise<WorkerDoctorReport>;
+  readonly #recoverStaleJobs: (() => Promise<void>) | undefined;
   readonly #claimNext: (workerId: string) => Promise<RenderJobRecord | null>;
   readonly #executeJob: WorkerLifecycleOptions['executeJob'];
   readonly #writeHeartbeat: WorkerHeartbeatWriter;
@@ -69,6 +74,7 @@ export class WorkerLifecycle {
   #pollPromise: Promise<void> | null = null;
   #shutdownPromise: Promise<void> | null = null;
   #pollTimer: ReturnType<typeof setTimeout> | undefined;
+  #nextStaleRecoveryAt = 0;
   #wakePoll: (() => void) | undefined;
   #resolveStopped!: () => void;
   readonly #stopped = new Promise<void>((resolve) => {
@@ -83,7 +89,9 @@ export class WorkerLifecycle {
     pollIntervalMs,
     shutdownTimeoutMs = DEFAULT_WORKER_SHUTDOWN_TIMEOUT_MS,
     heartbeatIntervalMs = DEFAULT_HEARTBEAT_INTERVAL_MS,
+    staleRecoveryIntervalMs = DEFAULT_STALE_RECOVERY_INTERVAL_MS,
     runDoctor,
+    recoverStaleJobs,
     claimNext,
     executeJob,
     writeHeartbeat,
@@ -97,6 +105,7 @@ export class WorkerLifecycle {
     assertPositiveInteger(pollIntervalMs, 'Poll interval');
     assertPositiveInteger(shutdownTimeoutMs, 'Shutdown timeout');
     assertPositiveInteger(heartbeatIntervalMs, 'Heartbeat interval');
+    assertPositiveInteger(staleRecoveryIntervalMs, 'Stale recovery interval');
 
     this.#workerId = workerId;
     this.#appVersion = appVersion;
@@ -104,7 +113,9 @@ export class WorkerLifecycle {
     this.#jobConcurrency = jobConcurrency;
     this.#pollIntervalMs = pollIntervalMs;
     this.#shutdownTimeoutMs = shutdownTimeoutMs;
+    this.#staleRecoveryIntervalMs = staleRecoveryIntervalMs;
     this.#runDoctor = runDoctor;
+    this.#recoverStaleJobs = recoverStaleJobs;
     this.#claimNext = claimNext;
     this.#executeJob = executeJob;
     this.#writeHeartbeat = writeHeartbeat;
@@ -153,6 +164,18 @@ export class WorkerLifecycle {
       await this.#publishUnhealthyHeartbeat();
       await this.#cleanupAndStop();
       throw error;
+    }
+
+    try {
+      await this.#recoverStaleJobs?.();
+      this.#nextStaleRecoveryAt = Date.now() + this.#staleRecoveryIntervalMs;
+    } catch (error) {
+      await this.#cleanupAndStop();
+      throw error;
+    }
+
+    if (this.#state !== 'STARTING') {
+      return;
     }
 
     this.#state = 'RUNNING';
@@ -220,6 +243,8 @@ export class WorkerLifecycle {
 
   async #poll(): Promise<void> {
     while (this.#acceptingJobs) {
+      await this.#recoverStaleJobsIfDue();
+
       if (this.#activeExecutions.size >= this.#jobConcurrency) {
         await this.#waitForNextPoll();
         continue;
@@ -241,6 +266,20 @@ export class WorkerLifecycle {
       }
 
       this.#startExecution(job);
+    }
+  }
+
+  async #recoverStaleJobsIfDue(): Promise<void> {
+    if (this.#recoverStaleJobs === undefined || Date.now() < this.#nextStaleRecoveryAt) {
+      return;
+    }
+
+    this.#nextStaleRecoveryAt = Date.now() + this.#staleRecoveryIntervalMs;
+
+    try {
+      await this.#recoverStaleJobs();
+    } catch (error) {
+      this.#onPollError(error);
     }
   }
 

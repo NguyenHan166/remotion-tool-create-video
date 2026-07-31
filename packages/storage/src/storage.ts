@@ -1,5 +1,5 @@
 import { constants } from 'node:fs';
-import { access, mkdir, open, unlink } from 'node:fs/promises';
+import { access, mkdir, open, rm, unlink } from 'node:fs/promises';
 import { isAbsolute, relative, resolve, sep, win32 } from 'node:path';
 import { randomUUID } from 'node:crypto';
 
@@ -95,6 +95,20 @@ function normalizeAssetId(assetId: string): string {
   }
 
   return normalizedAssetId;
+}
+
+function normalizeRenderJobId(renderJobId: string): string {
+  const normalizedRenderJobId = renderJobId.toLowerCase();
+
+  if (
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(
+      normalizedRenderJobId,
+    )
+  ) {
+    throw new StoragePathError('Render job ID must be a UUID');
+  }
+
+  return normalizedRenderJobId;
 }
 
 function normalizeFileExtension(fileExtension: string): string {
@@ -200,6 +214,16 @@ export async function assertStorageWritable(paths: StoragePaths): Promise<void> 
       ...Object.keys(STORAGE_DIRECTORY_NAMES).map((key) => paths[key as StorageDirectoryKey]),
     ].map(assertDirectoryWritable),
   );
+}
+
+export async function removeRenderJobTempDirectory(
+  paths: StoragePaths,
+  renderJobId: string,
+): Promise<void> {
+  await rm(safeJoin(paths.temp, normalizeRenderJobId(renderJobId)), {
+    force: true,
+    recursive: true,
+  });
 }
 
 export async function initializeStorage(dataDirectory: string): Promise<StoragePaths> {
