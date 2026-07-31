@@ -35,16 +35,26 @@ describe('database foundation', () => {
     }
   });
 
-  it('ships one initial migration for every application table', () => {
+  it('keeps the initial migration intact and applies render hardening forward', () => {
     const migrationsRoot = join(databaseRoot, 'prisma', 'migrations');
     const migrationDirectories = readdirSync(migrationsRoot, {
       withFileTypes: true,
-    }).filter((entry) => entry.isDirectory());
+    })
+      .filter((entry) => entry.isDirectory())
+      .sort((left, right) => left.name.localeCompare(right.name));
 
-    expect(migrationDirectories).toHaveLength(1);
+    const initialMigration = migrationDirectories.find(
+      (entry) => entry.name === '20260727130652_init',
+    );
+    const renderMigration = migrationDirectories.find(
+      (entry) => entry.name === '20260731100000_render_job_invariants',
+    );
 
-    const migrationSql = readFileSync(
-      join(migrationsRoot, migrationDirectories[0]!.name, 'migration.sql'),
+    expect(initialMigration).toBeDefined();
+    expect(renderMigration).toBeDefined();
+
+    const initialMigrationSql = readFileSync(
+      join(migrationsRoot, initialMigration!.name, 'migration.sql'),
       'utf8',
     );
     const expectedTables = [
@@ -61,8 +71,19 @@ describe('database foundation', () => {
     ];
 
     for (const table of expectedTables) {
-      expect(migrationSql).toContain(`CREATE TABLE "${table}"`);
+      expect(initialMigrationSql).toContain(`CREATE TABLE "${table}"`);
     }
+
+    const renderMigrationSql = readFileSync(
+      join(migrationsRoot, renderMigration!.name, 'migration.sql'),
+      'utf8',
+    );
+
+    expect(renderMigrationSql).not.toContain('CREATE TABLE');
+    expect(renderMigrationSql).toContain('ALTER TABLE "RenderJob"');
+    expect(renderMigrationSql).toContain('ALTER TABLE "RenderOutput"');
+    expect(renderMigrationSql).toContain('"RenderJob_progress_check"');
+    expect(renderMigrationSql).toContain('"RenderJob_status_heartbeatAt_idx"');
   });
 
   it('pins compatible Prisma packages to one version', () => {

@@ -9,6 +9,10 @@ export {
   PrismaClient,
   type Project,
   type ProjectRevision,
+  type RenderJob,
+  type RenderOutput,
+  type RenderStatus,
+  type OutputKind,
 } from '../generated/prisma/client.js';
 export {
   AssetInUseError,
@@ -37,6 +41,21 @@ export {
   type UpdateProjectDraftInput,
   synchronizeProjectAssetReferences,
 } from './project-repository.js';
+export {
+  InvalidRenderStatusTransitionError,
+  PrismaRenderJobRepository,
+  PrismaRenderOutputRepository,
+  RenderJobNotFoundError,
+  assertRenderStatusTransition,
+  canTransitionRenderStatus,
+  type CreateRenderOutputInput,
+  type ListRenderJobsInput,
+  type RenderJobRecord,
+  type RenderJobRecordPage,
+  type RenderJobRepository,
+  type RenderOutputRepository,
+  type TransitionRenderJobInput,
+} from './render-repository.js';
 
 export function createPrismaClient(databaseUrl: string): PrismaClient {
   const adapter = new PrismaPg(databaseUrl);

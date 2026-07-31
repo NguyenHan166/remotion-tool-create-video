@@ -175,6 +175,7 @@ model RenderJob {
   @@index([projectId, createdAt(sort: Desc)])
   @@index([revisionId])
   @@index([workerId, status])
+  @@index([status, heartbeatAt])
 }
 
 model RenderOutput {

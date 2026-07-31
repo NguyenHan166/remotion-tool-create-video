@@ -59,4 +59,18 @@ export {
   createTemplateCollectionHandlers,
   type TemplatePageResponse,
 } from './templates/handlers.js';
+export {
+  createRenderCollectionHandlers,
+  createRenderResourceHandlers,
+  type RenderResourceRouteContext,
+} from './renders/handlers.js';
+export {
+  DefaultRenderService,
+  RenderRecordNotFoundError,
+  toRenderJobResponse,
+  type RenderJobPageResponse,
+  type RenderJobResponse,
+  type RenderOutputResponse,
+  type RenderService,
+} from './renders/service.js';
 export { storagePaths } from './storage.js';
