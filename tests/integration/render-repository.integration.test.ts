@@ -4,6 +4,7 @@ import {
   InvalidRenderStatusTransitionError,
   PrismaRenderJobRepository,
   PrismaRenderOutputRepository,
+  PrismaRenderRevisionRepository,
   createPrismaClient,
   type PrismaClient,
 } from '../../packages/database/src/index.js';
@@ -293,6 +294,36 @@ integrationTest('Prisma render repositories integration', () => {
       assets: [
         {
           assetId,
+        },
+      ],
+    });
+
+    await database.project.update({
+      where: {
+        id: projectId,
+      },
+      data: {
+        draftDocument: {
+          ...document,
+          metadata: {
+            ...document.metadata,
+            title: 'Draft changed after enqueue',
+          },
+        },
+      },
+    });
+    await expect(
+      new PrismaRenderRevisionRepository(database).findById(job.revisionId),
+    ).resolves.toMatchObject({
+      id: job.revisionId,
+      projectId,
+      document,
+      assets: [
+        {
+          id: assetId,
+          kind: 'LOGO',
+          status: 'READY',
+          relativePath: `assets/${assetId}.png`,
         },
       ],
     });

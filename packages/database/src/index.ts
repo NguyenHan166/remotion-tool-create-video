@@ -26,6 +26,12 @@ export {
 } from './asset-repository.js';
 export { computeProjectContentHash } from './project-content-hash.js';
 export {
+  PrismaRenderRevisionRepository,
+  type RenderRevisionAssetRecord,
+  type RenderRevisionRepository,
+  type RenderRevisionSnapshotRecord,
+} from './render-revision-repository.js';
+export {
   AssetNotFoundError,
   PrismaProjectRepository,
   ProjectNotFoundError,

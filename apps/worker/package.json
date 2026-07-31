@@ -10,8 +10,10 @@
   },
   "dependencies": {
     "@hansys/database": "workspace:*",
+    "@hansys/project-schema": "workspace:*",
     "@hansys/shared": "workspace:*",
     "@hansys/storage": "workspace:*",
+    "@hansys/template-registry": "workspace:*",
     "@hansys/video": "workspace:*",
     "@remotion/bundler": "4.0.499",
     "@remotion/renderer": "4.0.499",

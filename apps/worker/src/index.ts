@@ -6,6 +6,11 @@ export {
 } from './heartbeat.js';
 export { createPrismaWorkerHeartbeatWriter } from './heartbeat-runtime.js';
 export {
+  WorkerAssetServer,
+  type WorkerAssetScope,
+  type WorkerServedAsset,
+} from './asset-server.js';
+export {
   BUNDLE_CACHE_MANIFEST_FILE,
   BUNDLE_CACHE_SCHEMA_VERSION,
   DEFAULT_BUNDLE_LOCK_POLL_INTERVAL_MS,
@@ -15,6 +20,22 @@ export {
   type PersistentRemotionBundleCacheOptions,
   type RemotionBundleKeyInput,
 } from './bundle-cache.js';
+export {
+  CompositionMetadataMismatchError,
+  ImmutableRenderRevisionError,
+  RenderRevisionAssetError,
+  RenderRevisionNotFoundError,
+  RenderRevisionTemplateError,
+  selectCompositionFromRevision,
+  type ImmutableRenderRevision,
+  type ImmutableRevisionAsset,
+  type RenderInputProps,
+  type RenderJobIdentity,
+  type RenderPreparationStage,
+  type SelectCompositionFromRevisionOptions,
+  type SelectedComposition,
+  type SelectedRenderComposition,
+} from './render-composition.js';
 export {
   WorkerDoctorError,
   assertWorkerDoctorHealthy,

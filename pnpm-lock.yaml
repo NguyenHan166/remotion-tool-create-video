@@ -93,12 +93,18 @@ importers:
       '@hansys/database':
         specifier: workspace:*
         version: link:../../packages/database
+      '@hansys/project-schema':
+        specifier: workspace:*
+        version: link:../../packages/project-schema
       '@hansys/shared':
         specifier: workspace:*
         version: link:../../packages/shared
       '@hansys/storage':
         specifier: workspace:*
         version: link:../../packages/storage
+      '@hansys/template-registry':
+        specifier: workspace:*
+        version: link:../../packages/template-registry
       '@hansys/video':
         specifier: workspace:*
         version: link:../../packages/video

@@ -1,9 +1,10 @@
 import { Composition } from 'remotion';
+import { PROJECT_VIDEO_COMPOSITION_ID } from './composition.js';
 import { STUDIO_VIDEO_PROPS } from './fixture.js';
 import { calculateProjectMetadata, getTotalDurationInFrames } from './metadata.js';
 import { ProjectVideo } from './project-video.js';
 
-export const PROJECT_VIDEO_COMPOSITION_ID = 'ProjectVideo';
+export { PROJECT_VIDEO_COMPOSITION_ID } from './composition.js';
 
 export function Root() {
   const { composition } = STUDIO_VIDEO_PROPS.project;
