@@ -7,10 +7,12 @@ import {
   createPrismaClient,
   type PrismaClient,
 } from '../../packages/database/src/index.js';
+import { parseProjectDocument } from '../../packages/project-schema/src/index.js';
 
 const testDatabaseUrl = process.env.TEST_DATABASE_URL;
 const integrationTest = testDatabaseUrl === undefined ? describe.skip : describe;
 const createdProjectIds: string[] = [];
+const createdAssetIds: string[] = [];
 let database: PrismaClient;
 
 integrationTest('Prisma render repositories integration', () => {
@@ -47,6 +49,18 @@ integrationTest('Prisma render repositories integration', () => {
         },
       },
     });
+
+    const assetIds = createdAssetIds.splice(0);
+
+    if (assetIds.length > 0) {
+      await database.asset.deleteMany({
+        where: {
+          id: {
+            in: assetIds,
+          },
+        },
+      });
+    }
   });
 
   afterAll(async () => {
@@ -145,5 +159,142 @@ integrationTest('Prisma render repositories integration', () => {
       renderJobId,
     });
     await expect(outputRepository.listByRenderJobId(renderJobId)).resolves.toHaveLength(1);
+  });
+
+  it('rolls back the revision snapshot when queued job creation fails', async () => {
+    const projectId = randomUUID();
+    createdProjectIds.push(projectId);
+    const document = parseProjectDocument({
+      schemaVersion: 1,
+      metadata: {
+        title: 'Atomic enqueue rollback',
+      },
+      template: {
+        id: 'news-clean-v1',
+        version: 1,
+      },
+      scenes: [
+        {
+          id: randomUUID(),
+          type: 'hook',
+          name: 'Opening',
+        },
+      ],
+    });
+
+    await database.project.create({
+      data: {
+        id: projectId,
+        name: 'Atomic enqueue rollback',
+        draftDocument: document,
+      },
+    });
+
+    const repository = new PrismaRenderJobRepository(database);
+    await expect(
+      repository.enqueue({
+        projectId,
+        preset: 'x'.repeat(101),
+        validateDraft: () => undefined,
+      }),
+    ).rejects.toThrow();
+
+    await expect(
+      database.projectRevision.count({
+        where: {
+          projectId,
+        },
+      }),
+    ).resolves.toBe(0);
+    await expect(
+      database.renderJob.count({
+        where: {
+          projectId,
+        },
+      }),
+    ).resolves.toBe(0);
+  });
+
+  it('atomically freezes ready assets into a revision and queues its job', async () => {
+    const projectId = randomUUID();
+    const assetId = randomUUID();
+    createdProjectIds.push(projectId);
+    createdAssetIds.push(assetId);
+    const document = parseProjectDocument({
+      schemaVersion: 1,
+      metadata: {
+        title: 'Atomic enqueue success',
+      },
+      template: {
+        id: 'news-clean-v1',
+        version: 1,
+      },
+      theme: {
+        logoAssetId: assetId,
+      },
+      scenes: [
+        {
+          id: randomUUID(),
+          type: 'hook',
+          name: 'Opening',
+        },
+      ],
+    });
+
+    await database.asset.create({
+      data: {
+        id: assetId,
+        kind: 'LOGO',
+        status: 'READY',
+        originalName: 'logo.png',
+        storedName: `${assetId}.png`,
+        relativePath: `assets/${assetId}.png`,
+        mimeType: 'image/png',
+        sizeBytes: 128n,
+        sha256: 'f'.repeat(64),
+      },
+    });
+    await database.project.create({
+      data: {
+        id: projectId,
+        name: 'Atomic enqueue success',
+        draftDocument: document,
+      },
+    });
+
+    const repository = new PrismaRenderJobRepository(database);
+    const job = await repository.enqueue({
+      projectId,
+      preset: 'vertical-h264',
+      validateDraft: () => undefined,
+    });
+
+    expect(job).toMatchObject({
+      projectId,
+      status: 'QUEUED',
+      preset: 'vertical-h264',
+      outputs: [],
+    });
+    await expect(
+      database.projectRevision.findUnique({
+        where: {
+          id: job.revisionId,
+        },
+        include: {
+          assets: true,
+        },
+      }),
+    ).resolves.toMatchObject({
+      projectId,
+      revisionNumber: 1,
+      templateId: 'news-clean-v1',
+      templateVersion: 1,
+      document,
+      assets: [
+        {
+          assetId,
+        },
+      ],
+    });
   });
 });

@@ -4,7 +4,13 @@ import {
   type RenderJobRepository,
   type RenderStatus,
 } from '@hansys/database';
-import { type ListRendersQuery } from './contracts.js';
+import {
+  getTemplate,
+  templateRegistry,
+  type TemplateRegistry,
+  type TemplateValidationIssue,
+} from '@hansys/template-registry';
+import { type CreateRenderRequest, type ListRendersQuery } from './contracts.js';
 
 export type RenderOutputResponse = {
   id: string;
@@ -52,8 +58,20 @@ export type RenderJobPageResponse = {
 };
 
 export interface RenderService {
+  enqueue(input: CreateRenderRequest): Promise<RenderJobResponse>;
   list(input: ListRendersQuery): Promise<RenderJobPageResponse>;
   get(renderJobId: string): Promise<RenderJobResponse>;
+}
+
+export class RenderTemplateValidationError extends Error {
+  readonly code = 'PROJECT_VALIDATION_FAILED';
+  readonly details: readonly TemplateValidationIssue[];
+
+  constructor(details: readonly TemplateValidationIssue[]) {
+    super('Project document is incompatible with its template.');
+    this.name = 'RenderTemplateValidationError';
+    this.details = details;
+  }
 }
 
 export class RenderRecordNotFoundError extends Error {
@@ -119,9 +137,32 @@ export function toRenderJobResponse(job: RenderJobRecord): RenderJobResponse {
 
 export class DefaultRenderService implements RenderService {
   readonly #repository: RenderJobRepository;
+  readonly #templateRegistry: TemplateRegistry;
 
-  constructor(repository: RenderJobRepository) {
+  constructor(repository: RenderJobRepository, registry: TemplateRegistry = templateRegistry) {
     this.#repository = repository;
+    this.#templateRegistry = registry;
+  }
+
+  async enqueue(input: CreateRenderRequest): Promise<RenderJobResponse> {
+    const renderJob = await this.#repository.enqueue({
+      projectId: input.projectId,
+      preset: input.preset,
+      validateDraft: (document) => {
+        const manifest = getTemplate(
+          document.template.id,
+          document.template.version,
+          this.#templateRegistry,
+        );
+        const validation = manifest.validate(document);
+
+        if (validation.errors.length > 0) {
+          throw new RenderTemplateValidationError(validation.errors);
+        }
+      },
+    });
+
+    return toRenderJobResponse(renderJob);
   }
 
   async list(input: ListRendersQuery): Promise<RenderJobPageResponse> {

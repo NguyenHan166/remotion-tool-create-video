@@ -67,6 +67,7 @@ export {
 export {
   DefaultRenderService,
   RenderRecordNotFoundError,
+  RenderTemplateValidationError,
   toRenderJobResponse,
   type RenderJobPageResponse,
   type RenderJobResponse,
