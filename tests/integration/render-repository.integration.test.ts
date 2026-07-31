@@ -5,6 +5,7 @@ import {
   PrismaRenderJobRepository,
   PrismaRenderOutputRepository,
   PrismaRenderRevisionRepository,
+  RenderJobProgressRejectedError,
   createPrismaClient,
   type PrismaClient,
 } from '../../packages/database/src/index.js';
@@ -495,6 +496,107 @@ integrationTest('Prisma render repositories integration', () => {
     });
 
     expect(ineligibleJobs.map((job) => job.status)).toEqual(['QUEUED', 'QUEUED']);
+  });
+
+  it('persists monotonic progress only for the active worker', async () => {
+    const projectId = randomUUID();
+    const revisionId = randomUUID();
+    const renderJobId = randomUUID();
+    createdProjectIds.push(projectId);
+
+    await database.project.create({
+      data: {
+        id: projectId,
+        name: 'Render progress integration',
+        draftDocument: {},
+        revisions: {
+          create: {
+            id: revisionId,
+            revisionNumber: 1,
+            schemaVersion: 1,
+            templateId: 'news-clean-v1',
+            templateVersion: 1,
+            contentHash: 'e'.repeat(64),
+            document: {},
+          },
+        },
+      },
+    });
+    await database.renderJob.create({
+      data: {
+        id: renderJobId,
+        projectId,
+        revisionId,
+        preset: 'vertical-h264',
+        status: 'PREPARING',
+        progress: 0,
+        workerId: 'worker-a',
+      },
+    });
+
+    const repository = new PrismaRenderJobRepository(database);
+    await repository.updateProgress({
+      renderJobId,
+      workerId: 'worker-a',
+      status: 'BUNDLING',
+      progress: 0.03,
+      stageMessage: 'Building bundle.',
+    });
+    await repository.updateProgress({
+      renderJobId,
+      workerId: 'worker-a',
+      status: 'RENDERING',
+      progress: 0.4,
+      renderedFrames: 4,
+      encodedFrames: 1,
+      totalFrames: 12,
+      stageMessage: 'Rendering frames.',
+    });
+
+    await expect(
+      repository.updateProgress({
+        renderJobId,
+        workerId: 'worker-a',
+        status: 'RENDERING',
+        progress: 0.5,
+        renderedFrames: 3,
+        encodedFrames: 1,
+        totalFrames: 12,
+        stageMessage: 'Regressing frame count.',
+      }),
+    ).rejects.toBeInstanceOf(RenderJobProgressRejectedError);
+    await expect(
+      repository.updateProgress({
+        renderJobId,
+        workerId: 'worker-old',
+        status: 'ENCODING',
+        progress: 0.9,
+        renderedFrames: 12,
+        encodedFrames: 10,
+        totalFrames: 12,
+        stageMessage: 'Wrong worker.',
+      }),
+    ).rejects.toBeInstanceOf(RenderJobProgressRejectedError);
+    await repository.updateProgress({
+      renderJobId,
+      workerId: 'worker-a',
+      status: 'ENCODING',
+      progress: 0.9,
+      renderedFrames: 12,
+      encodedFrames: 10,
+      totalFrames: 12,
+      stageMessage: 'Encoding H.264 media.',
+    });
+
+    await expect(repository.findById(renderJobId)).resolves.toMatchObject({
+      status: 'ENCODING',
+      progress: 0.9,
+      renderedFrames: 12,
+      encodedFrames: 10,
+      totalFrames: 12,
+      workerId: 'worker-a',
+      stageMessage: 'Encoding H.264 media.',
+    });
   });
 
   it('recovers stale jobs across a worker restart and preserves fresh work', async () => {

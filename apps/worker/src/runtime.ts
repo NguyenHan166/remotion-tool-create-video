@@ -10,12 +10,13 @@ import {
 } from '@hansys/database';
 import {
   assertStorageWritable,
+  initializeRenderJobAttempt,
   removeRenderJobTempDirectory,
   resolveStoredAssetPath,
 } from '@hansys/storage';
 import { overrideVideoWebpackConfig } from '@hansys/video/bundler-config';
 import { bundle } from '@remotion/bundler';
-import { selectComposition } from '@remotion/renderer';
+import { renderMedia, selectComposition } from '@remotion/renderer';
 import { WorkerAssetServer } from './asset-server.js';
 import { PersistentRemotionBundleCache, computeRemotionBundleKey } from './bundle-cache.js';
 import { database } from './database.js';
@@ -24,6 +25,7 @@ import { workerServerEnvironment } from './environment.js';
 import { createPrismaWorkerHeartbeatWriter } from './heartbeat-runtime.js';
 import { WorkerLifecycle } from './lifecycle.js';
 import { selectCompositionFromRevision } from './render-composition.js';
+import { renderH264Media } from './render-media.js';
 import { storagePaths } from './storage.js';
 
 const require = createRequire(import.meta.url);
@@ -97,36 +99,66 @@ export const workerLifecycle = new WorkerLifecycle({
   ),
   claimNext: (claimingWorkerId) => renderJobRepository.claimNext(claimingWorkerId),
   executeJob: async (job) => {
-    const prepared = await selectCompositionFromRevision({
-      job,
-      loadRevision: (revisionId) => renderRevisionRepository.findById(revisionId),
-      verifyAsset: async (asset) => {
-        const file = await stat(resolveStoredAssetPath(storagePaths, asset.relativePath));
-
-        if (!file.isFile() || file.size <= 0) {
-          throw new Error(`Render asset ${asset.id} is missing or empty.`);
-        }
-      },
-      createAssetScope: (assets) => workerAssetServer.createScope(assets),
-      getBundle: getOrCreateRemotionBundle,
-      select: selectComposition,
-      onStage: async (stage) => {
-        await renderJobRepository.transitionStatus({
-          renderJobId: job.id,
-          nextStatus: stage,
-        });
-      },
-    });
+    const attemptPaths = await initializeRenderJobAttempt(storagePaths, job.id);
+    let prepared: Awaited<ReturnType<typeof selectCompositionFromRevision>> | undefined;
 
     try {
+      prepared = await selectCompositionFromRevision({
+        job,
+        loadRevision: (revisionId) => renderRevisionRepository.findById(revisionId),
+        verifyAsset: async (asset) => {
+          const file = await stat(resolveStoredAssetPath(storagePaths, asset.relativePath));
+
+          if (!file.isFile() || file.size <= 0) {
+            throw new Error(`Render asset ${asset.id} is missing or empty.`);
+          }
+        },
+        createAssetScope: (assets) => workerAssetServer.createScope(assets),
+        getBundle: getOrCreateRemotionBundle,
+        select: selectComposition,
+        onStage: async (stage) => {
+          await renderJobRepository.updateProgress({
+            renderJobId: job.id,
+            workerId,
+            status: stage,
+            progress: stage === 'BUNDLING' ? 0.03 : 0.1,
+            stageMessage:
+              stage === 'BUNDLING'
+                ? 'Building or loading Remotion bundle.'
+                : 'Selecting Remotion composition.',
+          });
+        },
+      });
+
       console.info(
         `Selected ${prepared.composition.id} for render job ${job.id} ` +
           `(${prepared.composition.width}x${prepared.composition.height}, ` +
           `${prepared.composition.durationInFrames} frames).`,
       );
-      throw new Error('Render media pipeline is not available yet.');
+      await renderH264Media({
+        preset: job.preset,
+        outputLocation: attemptPaths.video,
+        serveUrl: prepared.serveUrl,
+        composition: prepared.composition,
+        inputProps: prepared.inputProps,
+        frameConcurrency: workerServerEnvironment.RENDER_FRAME_CONCURRENCY,
+        muted: prepared.inputProps.project.export.muted,
+        render: renderMedia,
+        writeProgress: (progress) =>
+          renderJobRepository.updateProgress({
+            renderJobId: job.id,
+            workerId,
+            ...progress,
+          }),
+      });
+      console.info(`Rendered H.264 media for render job ${job.id} to ${attemptPaths.video}.`);
+      throw new Error('Render finalization pipeline is not available yet.');
     } finally {
-      await prepared.close();
+      try {
+        await prepared?.close();
+      } finally {
+        await removeRenderJobTempDirectory(storagePaths, job.id);
+      }
     }
   },
   writeHeartbeat: createPrismaWorkerHeartbeatWriter(database),

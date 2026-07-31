@@ -4,12 +4,15 @@ export {
   StoragePathError,
   assertStorageWritable,
   createAssetStorageLocation,
+  createRenderJobAttemptPaths,
   createStoragePaths,
+  initializeRenderJobAttempt,
   initializeStorage,
   removeRenderJobTempDirectory,
   safeJoin,
   type StorageDirectoryKey,
   type AssetStorageLocation,
+  type RenderJobAttemptPaths,
   type StoragePaths,
 } from './storage.js';
 export {

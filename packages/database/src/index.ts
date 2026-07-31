@@ -53,6 +53,7 @@ export {
   PrismaRenderOutputRepository,
   ProjectNotRenderableError,
   RenderAssetNotReadyError,
+  RenderJobProgressRejectedError,
   RenderJobNotFoundError,
   assertRenderAssetsReady,
   assertRenderWorkerId,
@@ -66,9 +67,11 @@ export {
   type RenderJobRecord,
   type RenderJobRecordPage,
   type RenderJobRepository,
+  type RenderProgressStatus,
   type RenderOutputRepository,
   type StaleRenderRecoveryResult,
   type TransitionRenderJobInput,
+  type UpdateRenderJobProgressInput,
 } from './render-repository.js';
 
 export function createPrismaClient(databaseUrl: string): PrismaClient {

@@ -94,6 +94,10 @@ class EnqueueTestRepository implements RenderJobRepository {
     return { retriedJobIds: [], failedJobIds: [] };
   }
 
+  async updateProgress(): Promise<void> {
+    throw new Error('Not implemented by enqueue test repository.');
+  }
+
   async findById(): Promise<RenderJobRecord | null> {
     return null;
   }

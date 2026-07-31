@@ -33,6 +33,20 @@ export type TransitionRenderJobInput = {
   nextStatus: RenderStatus;
 };
 
+export type RenderProgressStatus = Extract<RenderStatus, 'BUNDLING' | 'RENDERING' | 'ENCODING'>;
+
+export type UpdateRenderJobProgressInput = {
+  renderJobId: string;
+  workerId: string;
+  status: RenderProgressStatus;
+  progress: number;
+  renderedFrames?: number;
+  encodedFrames?: number;
+  totalFrames?: number;
+  stageMessage: string;
+  heartbeatAt?: Date;
+};
+
 export type EnqueueRenderJobInput = {
   projectId: string;
   preset: string;
@@ -118,6 +132,17 @@ export class RenderAssetNotReadyError extends Error {
   }
 }
 
+export class RenderJobProgressRejectedError extends Error {
+  readonly code = 'RENDER_PROGRESS_REJECTED';
+  readonly renderJobId: string;
+
+  constructor(renderJobId: string) {
+    super('Render progress was rejected because the job owner or state changed.');
+    this.name = 'RenderJobProgressRejectedError';
+    this.renderJobId = renderJobId;
+  }
+}
+
 export class ProjectNotRenderableError extends Error {
   readonly code = 'RENDER_INVALID_STATE';
   readonly projectId: string;
@@ -180,6 +205,7 @@ export interface RenderJobRepository {
   enqueue(input: EnqueueRenderJobInput): Promise<RenderJobRecord>;
   claimNext(workerId: string): Promise<RenderJobRecord | null>;
   recoverStale(input: RecoverStaleRenderJobsInput): Promise<StaleRenderRecoveryResult>;
+  updateProgress(input: UpdateRenderJobProgressInput): Promise<void>;
   findById(renderJobId: string): Promise<RenderJobRecord | null>;
   list(input: ListRenderJobsInput): Promise<RenderJobRecordPage>;
   transitionStatus(input: TransitionRenderJobInput): Promise<RenderJobRecord>;
@@ -440,6 +466,99 @@ export class PrismaRenderJobRepository implements RenderJobRepository {
       },
       include: renderJobWithOutputs,
     });
+  }
+
+  async updateProgress({
+    renderJobId,
+    workerId,
+    status,
+    progress,
+    renderedFrames,
+    encodedFrames,
+    totalFrames,
+    stageMessage,
+    heartbeatAt = new Date(),
+  }: UpdateRenderJobProgressInput): Promise<void> {
+    assertRenderWorkerId(workerId);
+
+    if (!Number.isFinite(progress) || progress < 0 || progress > 1) {
+      throw new RangeError('Render progress must be a finite number from 0 to 1.');
+    }
+
+    if (stageMessage.length > 500) {
+      throw new RangeError('Render stage message must not exceed 500 characters.');
+    }
+
+    if (Number.isNaN(heartbeatAt.getTime())) {
+      throw new RangeError('Render heartbeat timestamp must be a valid date.');
+    }
+
+    const frameValues = [renderedFrames, encodedFrames];
+
+    if (
+      frameValues.some(
+        (value) => value !== undefined && (!Number.isSafeInteger(value) || value < 0),
+      ) ||
+      (totalFrames !== undefined && (!Number.isSafeInteger(totalFrames) || totalFrames <= 0)) ||
+      (totalFrames !== undefined &&
+        frameValues.some((value) => value !== undefined && value > totalFrames))
+    ) {
+      throw new RangeError(
+        'Render frame counters must be safe integers within the total frame count.',
+      );
+    }
+
+    const allowedCurrentStatuses = {
+      BUNDLING: ['PREPARING', 'BUNDLING'],
+      RENDERING: ['BUNDLING', 'RENDERING'],
+      ENCODING: ['RENDERING', 'ENCODING'],
+    } as const satisfies Record<RenderProgressStatus, readonly RenderStatus[]>;
+    const frameCounterGuards: Prisma.RenderJobWhereInput[] = [];
+
+    if (renderedFrames !== undefined) {
+      frameCounterGuards.push({
+        OR: [{ renderedFrames: null }, { renderedFrames: { lte: renderedFrames } }],
+      });
+    }
+
+    if (encodedFrames !== undefined) {
+      frameCounterGuards.push({
+        OR: [{ encodedFrames: null }, { encodedFrames: { lte: encodedFrames } }],
+      });
+    }
+
+    if (totalFrames !== undefined) {
+      frameCounterGuards.push({
+        OR: [{ totalFrames: null }, { totalFrames }],
+      });
+    }
+
+    const update = await this.#database.renderJob.updateMany({
+      where: {
+        id: renderJobId,
+        workerId,
+        status: {
+          in: [...allowedCurrentStatuses[status]],
+        },
+        progress: {
+          lte: progress,
+        },
+        ...(frameCounterGuards.length === 0 ? {} : { AND: frameCounterGuards }),
+      },
+      data: {
+        status,
+        progress,
+        stageMessage,
+        heartbeatAt,
+        ...(renderedFrames === undefined ? {} : { renderedFrames }),
+        ...(encodedFrames === undefined ? {} : { encodedFrames }),
+        ...(totalFrames === undefined ? {} : { totalFrames }),
+      },
+    });
+
+    if (update.count !== 1) {
+      throw new RenderJobProgressRejectedError(renderJobId);
+    }
   }
 
   async list({

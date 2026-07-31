@@ -19,6 +19,11 @@ export type AssetStorageLocation = Readonly<{
   relativePath: string;
 }>;
 
+export type RenderJobAttemptPaths = Readonly<{
+  directory: string;
+  video: string;
+}>;
+
 export type StoragePaths = Readonly<
   {
     root: string;
@@ -224,6 +229,30 @@ export async function removeRenderJobTempDirectory(
     force: true,
     recursive: true,
   });
+}
+
+export function createRenderJobAttemptPaths(
+  paths: StoragePaths,
+  renderJobId: string,
+): RenderJobAttemptPaths {
+  const directory = safeJoin(paths.temp, normalizeRenderJobId(renderJobId));
+
+  return Object.freeze({
+    directory,
+    video: safeJoin(directory, 'video.mp4'),
+  });
+}
+
+export async function initializeRenderJobAttempt(
+  paths: StoragePaths,
+  renderJobId: string,
+): Promise<RenderJobAttemptPaths> {
+  const attemptPaths = createRenderJobAttemptPaths(paths, renderJobId);
+
+  await rm(attemptPaths.directory, { force: true, recursive: true });
+  await mkdir(attemptPaths.directory);
+
+  return attemptPaths;
 }
 
 export async function initializeStorage(dataDirectory: string): Promise<StoragePaths> {

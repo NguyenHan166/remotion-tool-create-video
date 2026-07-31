@@ -13,6 +13,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   STORAGE_DIRECTORY_NAMES,
   StoragePathError,
+  createRenderJobAttemptPaths,
+  initializeRenderJobAttempt,
   initializeStorage,
   removeRenderJobTempDirectory,
   safeJoin,
@@ -104,6 +106,35 @@ describe('storage bootstrap', () => {
 });
 
 describe('render attempt cleanup', () => {
+  it('initializes a clean UUID-scoped H.264 output path', async () => {
+    const parent = createTemporaryDirectory();
+    const paths = await initializeStorage(join(parent, 'data'));
+    const renderJobId = '11111111-1111-4111-8111-111111111111';
+    const expectedDirectory = join(paths.temp, renderJobId);
+    const staleOutput = join(expectedDirectory, 'video.mp4');
+    mkdirSync(expectedDirectory, { recursive: true });
+    writeFileSync(staleOutput, 'partial');
+
+    const attemptPaths = await initializeRenderJobAttempt(paths, renderJobId);
+
+    expect(attemptPaths).toEqual({
+      directory: expectedDirectory,
+      video: staleOutput,
+    });
+    expect(statSync(attemptPaths.directory).isDirectory()).toBe(true);
+    expect(existsSync(staleOutput)).toBe(false);
+  });
+
+  it('rejects unsafe attempt paths before touching storage', async () => {
+    const parent = createTemporaryDirectory();
+    const paths = await initializeStorage(join(parent, 'data'));
+
+    expect(() => createRenderJobAttemptPaths(paths, '../outside')).toThrowError(StoragePathError);
+    await expect(initializeRenderJobAttempt(paths, '../outside')).rejects.toBeInstanceOf(
+      StoragePathError,
+    );
+  });
+
   it('removes only the UUID-scoped temporary directory and is idempotent', async () => {
     const parent = createTemporaryDirectory();
     const paths = await initializeStorage(join(parent, 'data'));
