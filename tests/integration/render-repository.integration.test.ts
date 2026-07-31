@@ -498,6 +498,75 @@ integrationTest('Prisma render repositories integration', () => {
     expect(ineligibleJobs.map((job) => job.status)).toEqual(['QUEUED', 'QUEUED']);
   });
 
+  it('cancels queued jobs immediately and lets the owning worker finish active cancellation', async () => {
+    const projectId = randomUUID();
+    const revisionId = randomUUID();
+    const queuedJobId = randomUUID();
+    const runningJobId = randomUUID();
+    createdProjectIds.push(projectId);
+
+    await database.project.create({
+      data: {
+        id: projectId,
+        name: 'Render cancellation integration',
+        draftDocument: {},
+        revisions: {
+          create: {
+            id: revisionId,
+            revisionNumber: 1,
+            schemaVersion: 1,
+            templateId: 'news-clean-v1',
+            templateVersion: 1,
+            contentHash: 'f'.repeat(64),
+            document: {},
+          },
+        },
+      },
+    });
+    await database.renderJob.createMany({
+      data: [
+        {
+          id: queuedJobId,
+          projectId,
+          revisionId,
+          preset: 'vertical-h264',
+        },
+        {
+          id: runningJobId,
+          projectId,
+          revisionId,
+          preset: 'vertical-h264',
+          status: 'RENDERING',
+          workerId: 'worker-a',
+        },
+      ],
+    });
+
+    const repository = new PrismaRenderJobRepository(database);
+    await expect(repository.requestCancellation(queuedJobId)).resolves.toMatchObject({
+      status: 'CANCELLED',
+      workerId: null,
+      finishedAt: expect.any(Date),
+    });
+    await expect(repository.requestCancellation(runningJobId)).resolves.toMatchObject({
+      status: 'CANCEL_REQUESTED',
+      workerId: 'worker-a',
+    });
+    await expect(
+      repository.isCancellationRequested({ renderJobId: runningJobId, workerId: 'worker-a' }),
+    ).resolves.toBe(true);
+    await expect(
+      repository.isCancellationRequested({ renderJobId: runningJobId, workerId: 'worker-old' }),
+    ).resolves.toBe(false);
+    await expect(
+      repository.completeCancellation({ renderJobId: runningJobId, workerId: 'worker-a' }),
+    ).resolves.toMatchObject({
+      status: 'CANCELLED',
+      workerId: 'worker-a',
+      finishedAt: expect.any(Date),
+    });
+  });
+
   it('persists monotonic progress only for the active worker', async () => {
     const projectId = randomUUID();
     const revisionId = randomUUID();

@@ -61,6 +61,7 @@ export {
 } from './templates/handlers.js';
 export {
   createRenderCollectionHandlers,
+  createRenderCancellationHandlers,
   createRenderResourceHandlers,
   type RenderResourceRouteContext,
 } from './renders/handlers.js';

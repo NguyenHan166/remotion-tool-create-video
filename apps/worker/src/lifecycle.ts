@@ -227,13 +227,14 @@ export class WorkerLifecycle {
     if (!completedBeforeTimeout && this.#activeExecutions.size > 0) {
       const activeJobIds = this.activeJobIds;
 
-      this.#activeExecutions.forEach(({ controller }) => controller.abort());
-
       try {
         await this.#onShutdownTimeout(activeJobIds);
       } catch (error) {
         this.#onJobErrorForShutdown(error);
       }
+
+      this.#activeExecutions.forEach(({ controller }) => controller.abort());
+      await this.#waitForExecutions(activeExecutions);
     }
 
     this.#heartbeatLoop.stop();

@@ -47,6 +47,15 @@ export type UpdateRenderJobProgressInput = {
   heartbeatAt?: Date;
 };
 
+export type RenderCancellationCheckInput = {
+  renderJobId: string;
+  workerId: string;
+};
+
+export type CompleteRenderCancellationInput = RenderCancellationCheckInput & {
+  finishedAt?: Date;
+};
+
 export type EnqueueRenderJobInput = {
   projectId: string;
   preset: string;
@@ -143,6 +152,17 @@ export class RenderJobProgressRejectedError extends Error {
   }
 }
 
+export class RenderJobCancellationRejectedError extends Error {
+  readonly code = 'RENDER_CANCELLATION_REJECTED';
+  readonly renderJobId: string;
+
+  constructor(renderJobId: string) {
+    super('Render cancellation was rejected because the job owner or state changed.');
+    this.name = 'RenderJobCancellationRejectedError';
+    this.renderJobId = renderJobId;
+  }
+}
+
 export class ProjectNotRenderableError extends Error {
   readonly code = 'RENDER_INVALID_STATE';
   readonly projectId: string;
@@ -205,6 +225,9 @@ export interface RenderJobRepository {
   enqueue(input: EnqueueRenderJobInput): Promise<RenderJobRecord>;
   claimNext(workerId: string): Promise<RenderJobRecord | null>;
   recoverStale(input: RecoverStaleRenderJobsInput): Promise<StaleRenderRecoveryResult>;
+  requestCancellation(renderJobId: string): Promise<RenderJobRecord>;
+  isCancellationRequested(input: RenderCancellationCheckInput): Promise<boolean>;
+  completeCancellation(input: CompleteRenderCancellationInput): Promise<RenderJobRecord>;
   updateProgress(input: UpdateRenderJobProgressInput): Promise<void>;
   findById(renderJobId: string): Promise<RenderJobRecord | null>;
   list(input: ListRenderJobsInput): Promise<RenderJobRecordPage>;
@@ -464,6 +487,110 @@ export class PrismaRenderJobRepository implements RenderJobRepository {
       where: {
         id: renderJobId,
       },
+      include: renderJobWithOutputs,
+    });
+  }
+
+  async requestCancellation(renderJobId: string): Promise<RenderJobRecord> {
+    return this.#database.$transaction(async (transaction) => {
+      const jobs = await transaction.$queryRaw<Array<{ status: RenderStatus }>>(
+        Prisma.sql`
+          SELECT status
+          FROM "RenderJob"
+          WHERE id = ${renderJobId}::uuid
+          FOR UPDATE
+        `,
+      );
+      const currentStatus = jobs[0]?.status;
+
+      if (currentStatus === undefined) {
+        throw new RenderJobNotFoundError(renderJobId);
+      }
+
+      if (currentStatus === 'CANCEL_REQUESTED') {
+        return transaction.renderJob.findUniqueOrThrow({
+          where: { id: renderJobId },
+          include: renderJobWithOutputs,
+        });
+      }
+
+      assertRenderStatusTransition(renderJobId, currentStatus, 'CANCEL_REQUESTED');
+      await transaction.renderJob.update({
+        where: { id: renderJobId },
+        data: {
+          status: 'CANCEL_REQUESTED',
+          stageMessage: 'Cancellation requested.',
+        },
+      });
+
+      if (currentStatus !== 'QUEUED') {
+        return transaction.renderJob.findUniqueOrThrow({
+          where: { id: renderJobId },
+          include: renderJobWithOutputs,
+        });
+      }
+
+      return transaction.renderJob.update({
+        where: { id: renderJobId },
+        data: {
+          status: 'CANCELLED',
+          stageMessage: 'Render cancelled before execution.',
+          workerId: null,
+          heartbeatAt: null,
+          finishedAt: new Date(),
+        },
+        include: renderJobWithOutputs,
+      });
+    });
+  }
+
+  async isCancellationRequested({
+    renderJobId,
+    workerId,
+  }: RenderCancellationCheckInput): Promise<boolean> {
+    assertRenderWorkerId(workerId);
+    const job = await this.#database.renderJob.findUnique({
+      where: { id: renderJobId },
+      select: {
+        status: true,
+        workerId: true,
+      },
+    });
+
+    return job?.status === 'CANCEL_REQUESTED' && job.workerId === workerId;
+  }
+
+  async completeCancellation({
+    renderJobId,
+    workerId,
+    finishedAt = new Date(),
+  }: CompleteRenderCancellationInput): Promise<RenderJobRecord> {
+    assertRenderWorkerId(workerId);
+
+    if (Number.isNaN(finishedAt.getTime())) {
+      throw new RangeError('Render cancellation timestamp must be a valid date.');
+    }
+
+    const updated = await this.#database.renderJob.updateMany({
+      where: {
+        id: renderJobId,
+        workerId,
+        status: 'CANCEL_REQUESTED',
+      },
+      data: {
+        status: 'CANCELLED',
+        stageMessage: 'Render cancelled.',
+        heartbeatAt: finishedAt,
+        finishedAt,
+      },
+    });
+
+    if (updated.count !== 1) {
+      throw new RenderJobCancellationRejectedError(renderJobId);
+    }
+
+    return this.#database.renderJob.findUniqueOrThrow({
+      where: { id: renderJobId },
       include: renderJobWithOutputs,
     });
   }

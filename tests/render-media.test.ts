@@ -46,6 +46,7 @@ function progress(
 describe('H.264 media rendering', () => {
   it('renders with immutable props and throttles progress except on stage changes', async () => {
     const writes: Array<Parameters<RenderH264MediaOptions['writeProgress']>[0]> = [];
+    const cancelSignal = vi.fn();
     let receivedOptions: RenderOptions | undefined;
     const render = vi.fn(async (options: RenderOptions) => {
       receivedOptions = options;
@@ -72,6 +73,7 @@ describe('H.264 media rendering', () => {
         inputProps,
         frameConcurrency: '50%',
         muted: false,
+        cancelSignal,
         render,
         writeProgress: async (value) => {
           writes.push(value);
@@ -86,6 +88,7 @@ describe('H.264 media rendering', () => {
       composition,
       concurrency: '50%',
       muted: false,
+      cancelSignal,
       crf: 23,
       x264Preset: 'medium',
       overwrite: false,

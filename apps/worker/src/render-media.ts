@@ -1,4 +1,9 @@
-import type { RenderMediaProgress, X264Preset, renderMedia } from '@remotion/renderer';
+import type {
+  CancelSignal,
+  RenderMediaProgress,
+  X264Preset,
+  renderMedia,
+} from '@remotion/renderer';
 import type { RenderInputProps, SelectedComposition } from './render-composition.js';
 
 export const RENDER_PROGRESS_INTERVAL_MS = 500;
@@ -24,6 +29,7 @@ export type RenderH264MediaOptions = {
   inputProps: RenderInputProps;
   frameConcurrency: string | number;
   muted: boolean;
+  cancelSignal?: CancelSignal;
   render: typeof renderMedia;
   writeProgress: (progress: RenderExecutionProgress) => Promise<void>;
   progressIntervalMs?: number;
@@ -215,6 +221,7 @@ export async function renderH264Media({
   inputProps,
   frameConcurrency,
   muted,
+  cancelSignal,
   render,
   writeProgress,
   progressIntervalMs = RENDER_PROGRESS_INTERVAL_MS,
@@ -246,6 +253,7 @@ export async function renderH264Media({
       inputProps,
       concurrency: frameConcurrency,
       muted,
+      ...(cancelSignal === undefined ? {} : { cancelSignal }),
       crf: quality.crf,
       x264Preset: quality.x264Preset,
       overwrite: false,

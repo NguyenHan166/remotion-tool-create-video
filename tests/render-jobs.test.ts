@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   InvalidRenderStatusTransitionError,
+  RenderJobNotFoundError,
   assertRenderStatusTransition,
   canTransitionRenderStatus,
   type RenderJobRecord,
@@ -10,6 +11,7 @@ import {
 } from '../packages/database/src/index.js';
 import {
   createRenderCollectionHandlers,
+  createRenderCancellationHandlers,
   createRenderResourceHandlers,
 } from '../apps/web/src/renders/handlers.js';
 import { DefaultRenderService } from '../apps/web/src/renders/service.js';
@@ -114,6 +116,48 @@ class MemoryRenderJobRepository implements RenderJobRepository {
 
   async recoverStale() {
     return { retriedJobIds: [], failedJobIds: [] };
+  }
+
+  async requestCancellation(id: string): Promise<RenderJobRecord> {
+    const job = await this.findById(id);
+
+    if (job === null) {
+      throw new RenderJobNotFoundError(id);
+    }
+
+    if (job.status === 'CANCEL_REQUESTED') {
+      return job;
+    }
+
+    assertRenderStatusTransition(id, job.status, 'CANCEL_REQUESTED');
+    job.status = job.status === 'QUEUED' ? 'CANCELLED' : 'CANCEL_REQUESTED';
+    job.stageMessage =
+      job.status === 'CANCELLED' ? 'Render cancelled before execution.' : 'Cancellation requested.';
+    job.finishedAt = job.status === 'CANCELLED' ? timestamp : null;
+    return job;
+  }
+
+  async isCancellationRequested({
+    renderJobId: id,
+    workerId,
+  }: Parameters<RenderJobRepository['isCancellationRequested']>[0]): Promise<boolean> {
+    const job = await this.findById(id);
+    return job?.status === 'CANCEL_REQUESTED' && job.workerId === workerId;
+  }
+
+  async completeCancellation({
+    renderJobId: id,
+  }: Parameters<RenderJobRepository['completeCancellation']>[0]): Promise<RenderJobRecord> {
+    const job = await this.findById(id);
+
+    if (job === null) {
+      throw new Error('Render job not found.');
+    }
+
+    assertRenderStatusTransition(id, job.status, 'CANCELLED');
+    job.status = 'CANCELLED';
+    job.finishedAt = timestamp;
+    return job;
   }
 
   async updateProgress(): Promise<void> {
@@ -288,6 +332,86 @@ describe('render list and read handlers', () => {
         code: 'BAD_REQUEST',
         message: 'Render ID is invalid.',
       },
+    });
+  });
+});
+
+describe('POST /renders/:renderId/cancel', () => {
+  it('finishes queued cancellation without assigning a worker', async () => {
+    const job = createRenderJob('QUEUED');
+    const handlers = createRenderCancellationHandlers(
+      new DefaultRenderService(new MemoryRenderJobRepository([job])),
+    );
+    const response = await handlers.POST(
+      new Request(`http://localhost/api/v1/renders/${renderJobId}/cancel`, { method: 'POST' }),
+      { params: Promise.resolve({ renderId: renderJobId }) },
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      id: renderJobId,
+      status: 'CANCELLED',
+      stageMessage: 'Render cancelled before execution.',
+      finishedAt: timestamp.toISOString(),
+    });
+    expect(job.workerId).toBeNull();
+  });
+
+  it('requests cancellation from the worker running the job', async () => {
+    const job = createRenderJob('RENDERING');
+    job.workerId = 'worker-a';
+    const handlers = createRenderCancellationHandlers(
+      new DefaultRenderService(new MemoryRenderJobRepository([job])),
+    );
+    const response = await handlers.POST(
+      new Request(`http://localhost/api/v1/renders/${renderJobId}/cancel`, { method: 'POST' }),
+      { params: Promise.resolve({ renderId: renderJobId }) },
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      id: renderJobId,
+      status: 'CANCEL_REQUESTED',
+      stageMessage: 'Cancellation requested.',
+    });
+  });
+
+  it('rejects cancellation for terminal jobs and malformed IDs', async () => {
+    const handlers = createRenderCancellationHandlers(
+      new DefaultRenderService(new MemoryRenderJobRepository([createRenderJob('COMPLETED')])),
+    );
+    const conflict = await handlers.POST(
+      new Request(`http://localhost/api/v1/renders/${renderJobId}/cancel`, { method: 'POST' }),
+      { params: Promise.resolve({ renderId: renderJobId }) },
+    );
+    const invalid = await handlers.POST(
+      new Request('http://localhost/api/v1/renders/not-a-uuid/cancel', { method: 'POST' }),
+      { params: Promise.resolve({ renderId: 'not-a-uuid' }) },
+    );
+
+    expect(conflict.status).toBe(409);
+    await expect(conflict.json()).resolves.toMatchObject({
+      error: { code: 'RENDER_INVALID_STATE' },
+    });
+    expect(invalid.status).toBe(400);
+    await expect(invalid.json()).resolves.toMatchObject({
+      error: { code: 'BAD_REQUEST' },
+    });
+  });
+
+  it('returns the standard not-found response for a missing render', async () => {
+    const missingId = '55555555-5555-4555-8555-555555555555';
+    const handlers = createRenderCancellationHandlers(
+      new DefaultRenderService(new MemoryRenderJobRepository([])),
+    );
+    const response = await handlers.POST(
+      new Request(`http://localhost/api/v1/renders/${missingId}/cancel`, { method: 'POST' }),
+      { params: Promise.resolve({ renderId: missingId }) },
+    );
+
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toMatchObject({
+      error: { code: 'RENDER_NOT_FOUND' },
     });
   });
 });

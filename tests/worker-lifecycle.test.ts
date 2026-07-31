@@ -286,7 +286,9 @@ describe('worker lifecycle', () => {
       await new Promise<void>((resolve) => signal.addEventListener('abort', () => resolve()));
     });
     const claimNext = vi.fn().mockResolvedValueOnce(createClaimedJob()).mockResolvedValue(null);
-    const onShutdownTimeout = vi.fn().mockResolvedValue(undefined);
+    const onShutdownTimeout = vi.fn(async () => {
+      expect(executionSignal?.aborted).toBe(false);
+    });
     const { lifecycle } = createLifecycle({
       claimNext,
       executeJob,

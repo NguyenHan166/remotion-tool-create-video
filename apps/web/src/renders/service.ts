@@ -3,6 +3,7 @@ import {
   type RenderJobRecord,
   type RenderJobRepository,
   type RenderStatus,
+  RenderJobNotFoundError,
 } from '@hansys/database';
 import {
   getTemplate,
@@ -61,6 +62,7 @@ export interface RenderService {
   enqueue(input: CreateRenderRequest): Promise<RenderJobResponse>;
   list(input: ListRendersQuery): Promise<RenderJobPageResponse>;
   get(renderJobId: string): Promise<RenderJobResponse>;
+  cancel(renderJobId: string): Promise<RenderJobResponse>;
 }
 
 export class RenderTemplateValidationError extends Error {
@@ -189,5 +191,17 @@ export class DefaultRenderService implements RenderService {
     }
 
     return toRenderJobResponse(renderJob);
+  }
+
+  async cancel(renderJobId: string): Promise<RenderJobResponse> {
+    try {
+      return toRenderJobResponse(await this.#repository.requestCancellation(renderJobId));
+    } catch (error) {
+      if (error instanceof RenderJobNotFoundError) {
+        throw new RenderRecordNotFoundError();
+      }
+
+      throw error;
+    }
   }
 }

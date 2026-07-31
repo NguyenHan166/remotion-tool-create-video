@@ -16,7 +16,7 @@ import {
 } from '@hansys/storage';
 import { overrideVideoWebpackConfig } from '@hansys/video/bundler-config';
 import { bundle } from '@remotion/bundler';
-import { renderMedia, selectComposition } from '@remotion/renderer';
+import { makeCancelSignal, renderMedia, selectComposition } from '@remotion/renderer';
 import { WorkerAssetServer } from './asset-server.js';
 import { PersistentRemotionBundleCache, computeRemotionBundleKey } from './bundle-cache.js';
 import { database } from './database.js';
@@ -24,6 +24,10 @@ import { checkCommandAvailable, checkRemotionBrowser, runWorkerDoctor } from './
 import { workerServerEnvironment } from './environment.js';
 import { createPrismaWorkerHeartbeatWriter } from './heartbeat-runtime.js';
 import { WorkerLifecycle } from './lifecycle.js';
+import {
+  RenderCancellationMonitor,
+  runRenderAttemptWithCancellation,
+} from './render-cancellation.js';
 import { selectCompositionFromRevision } from './render-composition.js';
 import { renderH264Media } from './render-media.js';
 import { storagePaths } from './storage.js';
@@ -98,67 +102,93 @@ export const workerLifecycle = new WorkerLifecycle({
     Math.floor((workerServerEnvironment.RENDER_STALE_AFTER_MINUTES * 60_000) / 2),
   ),
   claimNext: (claimingWorkerId) => renderJobRepository.claimNext(claimingWorkerId),
-  executeJob: async (job) => {
+  executeJob: async (job, { signal }) => {
     const attemptPaths = await initializeRenderJobAttempt(storagePaths, job.id);
+    const remotionCancellation = makeCancelSignal();
+    const cancellationMonitor = new RenderCancellationMonitor({
+      pollCancellation: () =>
+        renderJobRepository.isCancellationRequested({
+          renderJobId: job.id,
+          workerId,
+        }),
+      cancelRender: remotionCancellation.cancel,
+      externalSignal: signal,
+    });
     let prepared: Awaited<ReturnType<typeof selectCompositionFromRevision>> | undefined;
 
-    try {
-      prepared = await selectCompositionFromRevision({
-        job,
-        loadRevision: (revisionId) => renderRevisionRepository.findById(revisionId),
-        verifyAsset: async (asset) => {
-          const file = await stat(resolveStoredAssetPath(storagePaths, asset.relativePath));
+    const outcome = await runRenderAttemptWithCancellation({
+      monitor: cancellationMonitor,
+      execute: async () => {
+        prepared = await selectCompositionFromRevision({
+          job,
+          loadRevision: (revisionId) => renderRevisionRepository.findById(revisionId),
+          verifyAsset: async (asset) => {
+            const file = await stat(resolveStoredAssetPath(storagePaths, asset.relativePath));
 
-          if (!file.isFile() || file.size <= 0) {
-            throw new Error(`Render asset ${asset.id} is missing or empty.`);
-          }
-        },
-        createAssetScope: (assets) => workerAssetServer.createScope(assets),
-        getBundle: getOrCreateRemotionBundle,
-        select: selectComposition,
-        onStage: async (stage) => {
-          await renderJobRepository.updateProgress({
-            renderJobId: job.id,
-            workerId,
-            status: stage,
-            progress: stage === 'BUNDLING' ? 0.03 : 0.1,
-            stageMessage:
-              stage === 'BUNDLING'
-                ? 'Building or loading Remotion bundle.'
-                : 'Selecting Remotion composition.',
-          });
-        },
-      });
+            if (!file.isFile() || file.size <= 0) {
+              throw new Error(`Render asset ${asset.id} is missing or empty.`);
+            }
+          },
+          createAssetScope: (assets) => workerAssetServer.createScope(assets),
+          getBundle: getOrCreateRemotionBundle,
+          select: selectComposition,
+          onStage: async (stage) => {
+            await cancellationMonitor.check();
+            await renderJobRepository.updateProgress({
+              renderJobId: job.id,
+              workerId,
+              status: stage,
+              progress: stage === 'BUNDLING' ? 0.03 : 0.1,
+              stageMessage:
+                stage === 'BUNDLING'
+                  ? 'Building or loading Remotion bundle.'
+                  : 'Selecting Remotion composition.',
+            });
+          },
+        });
 
-      console.info(
-        `Selected ${prepared.composition.id} for render job ${job.id} ` +
-          `(${prepared.composition.width}x${prepared.composition.height}, ` +
-          `${prepared.composition.durationInFrames} frames).`,
-      );
-      await renderH264Media({
-        preset: job.preset,
-        outputLocation: attemptPaths.video,
-        serveUrl: prepared.serveUrl,
-        composition: prepared.composition,
-        inputProps: prepared.inputProps,
-        frameConcurrency: workerServerEnvironment.RENDER_FRAME_CONCURRENCY,
-        muted: prepared.inputProps.project.export.muted,
-        render: renderMedia,
-        writeProgress: (progress) =>
-          renderJobRepository.updateProgress({
-            renderJobId: job.id,
-            workerId,
-            ...progress,
-          }),
-      });
-      console.info(`Rendered H.264 media for render job ${job.id} to ${attemptPaths.video}.`);
-      throw new Error('Render finalization pipeline is not available yet.');
-    } finally {
-      try {
-        await prepared?.close();
-      } finally {
-        await removeRenderJobTempDirectory(storagePaths, job.id);
-      }
+        console.info(
+          `Selected ${prepared.composition.id} for render job ${job.id} ` +
+            `(${prepared.composition.width}x${prepared.composition.height}, ` +
+            `${prepared.composition.durationInFrames} frames).`,
+        );
+        await renderH264Media({
+          preset: job.preset,
+          outputLocation: attemptPaths.video,
+          serveUrl: prepared.serveUrl,
+          composition: prepared.composition,
+          inputProps: prepared.inputProps,
+          frameConcurrency: workerServerEnvironment.RENDER_FRAME_CONCURRENCY,
+          muted: prepared.inputProps.project.export.muted,
+          cancelSignal: remotionCancellation.cancelSignal,
+          render: renderMedia,
+          writeProgress: (progress) =>
+            renderJobRepository.updateProgress({
+              renderJobId: job.id,
+              workerId,
+              ...progress,
+            }),
+        });
+        console.info(`Rendered H.264 media for render job ${job.id} to ${attemptPaths.video}.`);
+        throw new Error('Render finalization pipeline is not available yet.');
+      },
+      cleanup: async () => {
+        try {
+          await prepared?.close();
+        } finally {
+          await removeRenderJobTempDirectory(storagePaths, job.id);
+        }
+      },
+      completeCancellation: async () => {
+        await renderJobRepository.completeCancellation({
+          renderJobId: job.id,
+          workerId,
+        });
+      },
+    });
+
+    if (outcome === 'CANCELLED') {
+      console.info(`Cancelled render job ${job.id}.`);
     }
   },
   writeHeartbeat: createPrismaWorkerHeartbeatWriter(database),
@@ -175,8 +205,11 @@ export const workerLifecycle = new WorkerLifecycle({
   onHeartbeatError: (error) => {
     console.error('Failed to publish worker heartbeat', error);
   },
-  onShutdownTimeout: (jobIds) => {
+  onShutdownTimeout: async (jobIds) => {
     console.warn(`Worker shutdown timed out; cancellation requested for: ${jobIds.join(', ')}`);
+    await Promise.all(
+      jobIds.map((renderJobId) => renderJobRepository.requestCancellation(renderJobId)),
+    );
   },
   cleanup: async () => {
     try {

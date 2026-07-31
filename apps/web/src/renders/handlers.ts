@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import {
   AssetNotFoundError,
+  InvalidRenderStatusTransitionError,
   ProjectNotFoundError,
   ProjectNotRenderableError,
   RenderAssetNotReadyError,
@@ -141,6 +142,15 @@ function handleRenderServiceError(request: Request, error: unknown): Response {
     return createErrorResponse(request, 404, error.code, 'Render job not found.');
   }
 
+  if (error instanceof InvalidRenderStatusTransitionError) {
+    return createErrorResponse(
+      request,
+      409,
+      error.code,
+      `Render job cannot be cancelled from ${error.currentStatus}.`,
+    );
+  }
+
   return createErrorResponse(request, 500, 'INTERNAL_ERROR', 'An unexpected error occurred.');
 }
 
@@ -228,6 +238,33 @@ export function createRenderResourceHandlers(service: RenderService): {
 
       try {
         return Response.json(await service.get(renderIdResult.data));
+      } catch (error) {
+        return handleRenderServiceError(request, error);
+      }
+    },
+  };
+}
+
+export function createRenderCancellationHandlers(service: RenderService): {
+  POST: (request: Request, context: RenderResourceRouteContext) => Promise<Response>;
+} {
+  return {
+    POST: async (request, context) => {
+      const { renderId } = await context.params;
+      const renderIdResult = renderIdSchema.safeParse(renderId);
+
+      if (!renderIdResult.success) {
+        return createErrorResponse(
+          request,
+          400,
+          'BAD_REQUEST',
+          'Render ID is invalid.',
+          formatZodIssues(renderIdResult.error),
+        );
+      }
+
+      try {
+        return Response.json(await service.cancel(renderIdResult.data));
       } catch (error) {
         return handleRenderServiceError(request, error);
       }
