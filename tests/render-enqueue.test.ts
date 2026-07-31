@@ -86,6 +86,10 @@ class EnqueueTestRepository implements RenderJobRepository {
     return createQueuedJob();
   }
 
+  async claimNext(): Promise<RenderJobRecord | null> {
+    return null;
+  }
+
   async findById(): Promise<RenderJobRecord | null> {
     return null;
   }

@@ -108,6 +108,10 @@ class MemoryRenderJobRepository implements RenderJobRepository {
     throw new Error('Not implemented by this read-only test repository.');
   }
 
+  async claimNext(): Promise<RenderJobRecord | null> {
+    return null;
+  }
+
   async findById(id: string): Promise<RenderJobRecord | null> {
     return this.jobs.find((job) => job.id === id) ?? null;
   }

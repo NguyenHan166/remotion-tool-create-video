@@ -49,6 +49,7 @@ export {
   RenderAssetNotReadyError,
   RenderJobNotFoundError,
   assertRenderAssetsReady,
+  assertRenderWorkerId,
   assertRenderStatusTransition,
   canTransitionRenderStatus,
   type CreateRenderOutputInput,

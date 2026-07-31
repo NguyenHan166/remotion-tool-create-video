@@ -142,6 +142,12 @@ export function assertRenderAssetsReady(
   }
 }
 
+export function assertRenderWorkerId(workerId: string): void {
+  if (workerId.trim().length === 0 || workerId.length > 200) {
+    throw new RangeError('Worker ID must contain 1 to 200 characters.');
+  }
+}
+
 export function canTransitionRenderStatus(
   currentStatus: RenderStatus,
   nextStatus: RenderStatus,
@@ -161,6 +167,7 @@ export function assertRenderStatusTransition(
 
 export interface RenderJobRepository {
   enqueue(input: EnqueueRenderJobInput): Promise<RenderJobRecord>;
+  claimNext(workerId: string): Promise<RenderJobRecord | null>;
   findById(renderJobId: string): Promise<RenderJobRecord | null>;
   list(input: ListRenderJobsInput): Promise<RenderJobRecordPage>;
   transitionStatus(input: TransitionRenderJobInput): Promise<RenderJobRecord>;
@@ -273,6 +280,50 @@ export class PrismaRenderJobRepository implements RenderJobRepository {
           projectId,
           revisionId: revision.id,
           preset,
+        },
+        include: renderJobWithOutputs,
+      });
+    });
+  }
+
+  async claimNext(workerId: string): Promise<RenderJobRecord | null> {
+    assertRenderWorkerId(workerId);
+
+    return this.#database.$transaction(async (transaction) => {
+      const claimedJobs = await transaction.$queryRaw<Array<{ id: string }>>(
+        Prisma.sql`
+          WITH "claimableJob" AS (
+            SELECT "id"
+            FROM "RenderJob"
+            WHERE "status" = 'QUEUED'::"RenderStatus"
+              AND "availableAt" <= NOW()
+              AND "attempt" < "maxAttempts"
+            ORDER BY "priority" DESC, "createdAt" ASC
+            FOR UPDATE SKIP LOCKED
+            LIMIT 1
+          )
+          UPDATE "RenderJob" AS job
+          SET
+            "status" = 'PREPARING'::"RenderStatus",
+            "workerId" = ${workerId},
+            "attempt" = job."attempt" + 1,
+            "startedAt" = COALESCE(job."startedAt", NOW()),
+            "heartbeatAt" = NOW(),
+            "updatedAt" = NOW()
+          FROM "claimableJob"
+          WHERE job."id" = "claimableJob"."id"
+          RETURNING job."id"
+        `,
+      );
+      const claimedJobId = claimedJobs[0]?.id;
+
+      if (claimedJobId === undefined) {
+        return null;
+      }
+
+      return transaction.renderJob.findUniqueOrThrow({
+        where: {
+          id: claimedJobId,
         },
         include: renderJobWithOutputs,
       });

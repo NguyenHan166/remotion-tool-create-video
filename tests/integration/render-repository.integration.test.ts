@@ -297,4 +297,172 @@ integrationTest('Prisma render repositories integration', () => {
       ],
     });
   });
+
+  it('claims one owner per job under concurrent workers', async () => {
+    const projectId = randomUUID();
+    const revisionId = randomUUID();
+    const renderJobId = randomUUID();
+    createdProjectIds.push(projectId);
+
+    await database.project.create({
+      data: {
+        id: projectId,
+        name: 'Concurrent queue claim',
+        draftDocument: {},
+        revisions: {
+          create: {
+            id: revisionId,
+            revisionNumber: 1,
+            schemaVersion: 1,
+            templateId: 'news-clean-v1',
+            templateVersion: 1,
+            contentHash: 'b'.repeat(64),
+            document: {},
+          },
+        },
+        renderJobs: {
+          create: {
+            id: renderJobId,
+            revisionId,
+            preset: 'vertical-h264',
+          },
+        },
+      },
+    });
+
+    const secondDatabase = createPrismaClient(testDatabaseUrl!);
+    await secondDatabase.$connect();
+
+    try {
+      const claims = await Promise.all([
+        new PrismaRenderJobRepository(database).claimNext('worker-a'),
+        new PrismaRenderJobRepository(secondDatabase).claimNext('worker-b'),
+      ]);
+      const owners = claims.filter((claim) => claim !== null);
+
+      expect(owners).toHaveLength(1);
+      expect(owners[0]).toMatchObject({
+        id: renderJobId,
+        status: 'PREPARING',
+        attempt: 1,
+      });
+      expect(['worker-a', 'worker-b']).toContain(owners[0]?.workerId);
+      expect(claims.filter((claim) => claim === null)).toHaveLength(1);
+      await expect(
+        database.renderJob.findUnique({ where: { id: renderJobId } }),
+      ).resolves.toMatchObject({
+        status: 'PREPARING',
+        workerId: owners[0]?.workerId,
+        attempt: 1,
+        startedAt: expect.any(Date),
+        heartbeatAt: expect.any(Date),
+      });
+    } finally {
+      await secondDatabase.$disconnect();
+    }
+  });
+
+  it('respects availability, attempts, priority and FIFO ordering', async () => {
+    const projectId = randomUUID();
+    const revisionId = randomUUID();
+    const now = Date.now();
+    const highOldId = randomUUID();
+    const highNewId = randomUUID();
+    const lowId = randomUUID();
+    const futureId = randomUUID();
+    const exhaustedId = randomUUID();
+    createdProjectIds.push(projectId);
+
+    await database.project.create({
+      data: {
+        id: projectId,
+        name: 'Queue ordering',
+        draftDocument: {},
+        revisions: {
+          create: {
+            id: revisionId,
+            revisionNumber: 1,
+            schemaVersion: 1,
+            templateId: 'news-clean-v1',
+            templateVersion: 1,
+            contentHash: 'c'.repeat(64),
+            document: {},
+          },
+        },
+      },
+    });
+    await database.renderJob.createMany({
+      data: [
+        {
+          id: lowId,
+          projectId,
+          revisionId,
+          preset: 'vertical-h264',
+          priority: 1,
+          createdAt: new Date(now - 30_000),
+          availableAt: new Date(now - 30_000),
+        },
+        {
+          id: highOldId,
+          projectId,
+          revisionId,
+          preset: 'vertical-h264',
+          priority: 10,
+          createdAt: new Date(now - 20_000),
+          availableAt: new Date(now - 20_000),
+        },
+        {
+          id: highNewId,
+          projectId,
+          revisionId,
+          preset: 'vertical-h264',
+          priority: 10,
+          createdAt: new Date(now - 10_000),
+          availableAt: new Date(now - 10_000),
+        },
+        {
+          id: futureId,
+          projectId,
+          revisionId,
+          preset: 'vertical-h264',
+          priority: 100,
+          availableAt: new Date(now + 60_000),
+        },
+        {
+          id: exhaustedId,
+          projectId,
+          revisionId,
+          preset: 'vertical-h264',
+          priority: 100,
+          attempt: 2,
+          maxAttempts: 2,
+          availableAt: new Date(now - 60_000),
+        },
+      ],
+    });
+
+    const repository = new PrismaRenderJobRepository(database);
+    await expect(repository.claimNext('ordering-worker-1')).resolves.toMatchObject({
+      id: highOldId,
+    });
+    await expect(repository.claimNext('ordering-worker-2')).resolves.toMatchObject({
+      id: highNewId,
+    });
+    await expect(repository.claimNext('ordering-worker-3')).resolves.toMatchObject({
+      id: lowId,
+    });
+    await expect(repository.claimNext('ordering-worker-4')).resolves.toBeNull();
+    const ineligibleJobs = await database.renderJob.findMany({
+      where: {
+        id: {
+          in: [futureId, exhaustedId],
+        },
+      },
+      orderBy: {
+        id: 'asc',
+      },
+    });
+
+    expect(ineligibleJobs.map((job) => job.status)).toEqual(['QUEUED', 'QUEUED']);
+  });
 });
