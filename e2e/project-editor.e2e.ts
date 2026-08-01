@@ -217,6 +217,8 @@ test.describe('project editor preview', () => {
     await page.goto(`/projects/${projectId}`);
 
     await expect(page.getByRole('heading', { name: 'Xem trước dự án' })).toBeVisible();
+    await expect(page.getByLabel('Provider TTS')).toBeDisabled();
+    await expect(page.getByRole('button', { name: 'Tạo voiceover' })).toBeDisabled();
     const headline = 'Tiêu đề thay đổi ngay trong Player';
     await page.getByLabel('Tiêu đề').fill(headline);
     await expect(page.getByTestId('remotion-player')).toContainText(headline);

@@ -40,6 +40,7 @@ import { RenderQueue } from './render-queue';
 import { SceneInspector } from './scene-inspector';
 import { SceneList } from './scene-list';
 import { SceneStripControls } from './scene-strip-controls';
+import { TtsSettings } from './tts-settings';
 import { VoiceoverEditor } from './voiceover-editor';
 
 function projectErrorMessage(error: unknown): string {
@@ -395,6 +396,8 @@ function LoadedProjectEditor({
               }));
             }}
           />
+
+          <TtsSettings projectArchived={project.status === 'ARCHIVED'} />
         </section>
 
         <aside className="min-w-0">

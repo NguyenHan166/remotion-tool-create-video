@@ -10,3 +10,18 @@ export {
   type WebServerEnvironment,
   type WorkerServerEnvironment,
 } from './environment.js';
+export {
+  createTtsProviderRegistry,
+  TTS_PROVIDER_IDS,
+  TTS_PROVIDER_KOKORO,
+  ttsProviderRegistry,
+  TtsProviderAlreadyRegisteredError,
+  TtsProviderNotFoundError,
+  type TtsAudioFormat,
+  type TtsProvider,
+  type TtsProviderId,
+  type TtsProviderRegistry,
+  type TtsSynthesisRequest,
+  type TtsSynthesisResult,
+  type TtsVoice,
+} from './tts.js';
