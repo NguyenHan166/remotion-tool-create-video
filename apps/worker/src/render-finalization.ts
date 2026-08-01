@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process';
 import { stat } from 'node:fs/promises';
-import type { renderStill } from '@remotion/renderer';
+import type { BrowserLog, renderStill } from '@remotion/renderer';
 import { RenderPipelineError } from './render-errors.js';
 import type { RenderInputProps, SelectedComposition } from './render-composition.js';
 
@@ -189,6 +189,7 @@ export async function renderThumbnail({
   inputProps,
   cancelSignal,
   render,
+  onBrowserLog,
 }: {
   outputLocation: string;
   serveUrl: string;
@@ -196,6 +197,7 @@ export async function renderThumbnail({
   inputProps: RenderInputProps;
   cancelSignal: NonNullable<Parameters<RenderStill>[0]['cancelSignal']>;
   render: RenderStill;
+  onBrowserLog?: (log: BrowserLog) => void;
 }): Promise<RenderedThumbnail> {
   const frame = Math.floor((composition.durationInFrames - 1) / 2);
 
@@ -209,6 +211,7 @@ export async function renderThumbnail({
     jpegQuality: 85,
     overwrite: false,
     cancelSignal,
+    ...(onBrowserLog === undefined ? {} : { onBrowserLog }),
   });
 
   return {

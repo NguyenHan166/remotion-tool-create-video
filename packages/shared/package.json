@@ -6,6 +6,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./environment": "./src/environment.ts",
+    "./observability": "./src/observability.ts",
     "./tts": "./src/tts.ts"
   },
   "scripts": {

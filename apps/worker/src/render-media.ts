@@ -1,4 +1,5 @@
 import type {
+  BrowserLog,
   CancelSignal,
   RenderMediaProgress,
   X264Preset,
@@ -32,6 +33,7 @@ export type RenderH264MediaOptions = {
   cancelSignal?: CancelSignal;
   render: typeof renderMedia;
   writeProgress: (progress: RenderExecutionProgress) => Promise<void>;
+  onBrowserLog?: (log: BrowserLog) => void;
   progressIntervalMs?: number;
 };
 
@@ -224,6 +226,7 @@ export async function renderH264Media({
   cancelSignal,
   render,
   writeProgress,
+  onBrowserLog,
   progressIntervalMs = RENDER_PROGRESS_INTERVAL_MS,
 }: RenderH264MediaOptions): ReturnType<typeof renderMedia> {
   if (!Number.isSafeInteger(composition.durationInFrames) || composition.durationInFrames <= 0) {
@@ -258,6 +261,7 @@ export async function renderH264Media({
       x264Preset: quality.x264Preset,
       overwrite: false,
       onProgress: (progress) => progressReporter.report(progress),
+      ...(onBrowserLog === undefined ? {} : { onBrowserLog }),
     });
   } catch (error) {
     await progressReporter.abort();

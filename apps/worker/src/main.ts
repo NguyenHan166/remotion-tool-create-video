@@ -1,4 +1,4 @@
-import { workerLifecycle, workerId } from './runtime.js';
+import { workerLifecycle, workerLogger } from './runtime.js';
 
 let shutdownRequested = false;
 
@@ -8,9 +8,9 @@ function requestShutdown(signal: NodeJS.Signals): void {
   }
 
   shutdownRequested = true;
-  console.info(`Worker ${workerId} received ${signal}; stopping gracefully.`);
+  workerLogger.info('worker.shutdown_requested', { signal });
   void workerLifecycle.shutdown().catch((error: unknown) => {
-    console.error('Worker graceful shutdown failed', error);
+    workerLogger.error('worker.graceful_shutdown_failed', {}, error);
     process.exitCode = 1;
   });
 }
@@ -23,10 +23,10 @@ process.once('SIGTERM', onSigterm);
 
 try {
   await workerLifecycle.start();
-  console.info(`Worker ${workerId} started.`);
+  workerLogger.info('worker.started');
   await workerLifecycle.waitUntilStopped();
 } catch (error) {
-  console.error('Worker startup failed', error);
+  workerLogger.error('worker.startup_failed', {}, error);
   process.exitCode = 1;
 } finally {
   process.off('SIGINT', onSigint);

@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto';
 import { AssetInUseError } from '@hansys/database';
 import {
   InvalidByteRangeError,
@@ -17,6 +16,7 @@ import {
   AssetRecordNotFoundError,
   type AssetService,
 } from './service.js';
+import { getRequestId } from '../observability.js';
 
 type ErrorDetail = {
   path: string;
@@ -48,7 +48,7 @@ function formatZodIssues(error: ZodError): ErrorDetail[] {
 }
 
 function createErrorResponse(request: Request, options: ErrorResponseOptions): Response {
-  const requestId = request.headers.get('x-request-id') ?? randomUUID();
+  const requestId = getRequestId(request);
   const body: ErrorEnvelope = {
     error: {
       code: options.code,

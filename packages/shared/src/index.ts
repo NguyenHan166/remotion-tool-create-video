@@ -25,3 +25,17 @@ export {
   type TtsSynthesisResult,
   type TtsVoice,
 } from './tts.js';
+export {
+  REDACTED_PATH,
+  REDACTED_VALUE,
+  StructuredLogger,
+  createStructuredLogger,
+  normalizeRequestId,
+  redactAbsolutePaths,
+  sanitizeLogValue,
+  type StructuredLogContext,
+  type StructuredLogEntry,
+  type StructuredLogLevel,
+  type StructuredLogSink,
+  type StructuredLoggerOptions,
+} from './observability.js';

@@ -14,6 +14,7 @@ import {
   STORAGE_DIRECTORY_NAMES,
   StoragePathError,
   createRenderJobAttemptPaths,
+  createRenderDiagnosticOutputPath,
   createRenderJobOutputPaths,
   finalizeRenderJobAttempt,
   initializeRenderJobAttempt,
@@ -109,6 +110,20 @@ describe('storage bootstrap', () => {
 });
 
 describe('render attempt cleanup', () => {
+  it('creates UUID-scoped relative diagnostic paths without exposing the storage root', async () => {
+    const parent = createTemporaryDirectory();
+    const paths = await initializeStorage(join(parent, 'data'));
+    const renderJobId = '11111111-1111-4111-8111-111111111111';
+
+    expect(createRenderDiagnosticOutputPath(paths, renderJobId, 2)).toEqual({
+      absolutePath: join(paths.logs, renderJobId, 'attempt-2.jsonl'),
+      relativePath: `logs/${renderJobId}/attempt-2.jsonl`,
+    });
+    expect(() => createRenderDiagnosticOutputPath(paths, renderJobId, 0)).toThrowError(
+      StoragePathError,
+    );
+  });
+
   it('initializes a clean UUID-scoped H.264 output path', async () => {
     const parent = createTemporaryDirectory();
     const paths = await initializeStorage(join(parent, 'data'));

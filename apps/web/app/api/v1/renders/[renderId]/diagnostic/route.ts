@@ -2,7 +2,7 @@ import { createRenderOutputFileHandlers } from '../../../../../../src/renders/ha
 import { withRequestLogging } from '../../../../../../src/observability.js';
 import { renderOutputFileService } from '../../../../../../src/renders/runtime.js';
 
-const handlers = createRenderOutputFileHandlers(renderOutputFileService, 'THUMBNAIL');
+const handlers = createRenderOutputFileHandlers(renderOutputFileService, 'LOG');
 
 export const dynamic = 'force-dynamic';
-export const GET = withRequestLogging('renders.thumbnail', handlers.GET);
+export const GET = withRequestLogging('renders.diagnostic', handlers.GET);

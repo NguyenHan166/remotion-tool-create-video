@@ -11,6 +11,7 @@ const renderJobId = '11111111-1111-4111-8111-111111111111';
 const timestamp = new Date('2026-08-01T08:00:00.000Z');
 const videoBytes = new TextEncoder().encode('0123456789');
 const thumbnailBytes = new TextEncoder().encode('jpeg');
+const diagnosticBytes = new TextEncoder().encode('{"message":"safe"}\n');
 const temporaryDirectories: string[] = [];
 
 function createJob(status: RenderJobRecord['status'] = 'COMPLETED'): RenderJobRecord {
@@ -65,6 +66,20 @@ function createJob(status: RenderJobRecord['status'] = 'COMPLETED'): RenderJobRe
         height: 1920,
         durationMs: null,
         metadata: { frame: 149 },
+        createdAt: timestamp,
+      },
+      {
+        id: '66666666-6666-4666-8666-666666666666',
+        renderJobId,
+        kind: 'LOG',
+        relativePath: `logs/${renderJobId}/attempt-1.jsonl`,
+        fileName: 'render-11111111-attempt-1.jsonl',
+        mimeType: 'application/x-ndjson',
+        sizeBytes: BigInt(diagnosticBytes.byteLength),
+        width: null,
+        height: null,
+        durationMs: null,
+        metadata: { redacted: true },
         createdAt: timestamp,
       },
     ],
@@ -127,6 +142,8 @@ async function setup(status: RenderJobRecord['status'] = 'COMPLETED') {
   mkdirSync(join(paths.renders, renderJobId));
   writeFileSync(join(paths.renders, renderJobId, 'video.mp4'), videoBytes);
   writeFileSync(join(paths.thumbnails, `${renderJobId}.jpg`), thumbnailBytes);
+  mkdirSync(join(paths.logs, renderJobId));
+  writeFileSync(join(paths.logs, renderJobId, 'attempt-1.jsonl'), diagnosticBytes);
   const service = new DefaultRenderOutputFileService(
     new OutputStreamingRepository(createJob(status)),
     paths,
@@ -135,6 +152,7 @@ async function setup(status: RenderJobRecord['status'] = 'COMPLETED') {
   return {
     video: createRenderOutputFileHandlers(service, 'VIDEO'),
     thumbnail: createRenderOutputFileHandlers(service, 'THUMBNAIL'),
+    diagnostic: createRenderOutputFileHandlers(service, 'LOG'),
   };
 }
 
@@ -171,6 +189,19 @@ describe('render output download API', () => {
     expect(response.headers.get('content-type')).toBe('image/jpeg');
     expect(response.headers.get('content-disposition')).toContain('inline;');
     expect(new TextDecoder().decode(await response.arrayBuffer())).toBe('jpeg');
+  });
+
+  it('downloads redacted diagnostic logs for failed renders', async () => {
+    const { diagnostic } = await setup('FAILED');
+    const response = await diagnostic.GET(
+      new Request(`http://localhost/api/v1/renders/${renderJobId}/diagnostic`),
+      context,
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('content-type')).toBe('application/x-ndjson');
+    expect(response.headers.get('content-disposition')).toContain('attachment;');
+    await expect(response.text()).resolves.toBe('{"message":"safe"}\n');
   });
 
   it('does not expose outputs before the render is completed', async () => {

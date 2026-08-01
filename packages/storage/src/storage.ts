@@ -33,6 +33,11 @@ export type RenderJobOutputPaths = Readonly<{
   thumbnailRelativePath: string;
 }>;
 
+export type RenderDiagnosticOutputPath = Readonly<{
+  absolutePath: string;
+  relativePath: string;
+}>;
+
 export type StoragePaths = Readonly<
   {
     root: string;
@@ -123,6 +128,14 @@ function normalizeRenderJobId(renderJobId: string): string {
   }
 
   return normalizedRenderJobId;
+}
+
+function normalizeRenderAttempt(attempt: number): string {
+  if (!Number.isSafeInteger(attempt) || attempt <= 0) {
+    throw new StoragePathError('Render attempt must be a positive safe integer');
+  }
+
+  return String(attempt);
 }
 
 function normalizeFileExtension(fileExtension: string): string {
@@ -266,6 +279,21 @@ export function createRenderJobOutputPaths(
     thumbnail: safeJoin(paths.thumbnails, `${normalizedRenderJobId}.jpg`),
     videoRelativePath: `${STORAGE_DIRECTORY_NAMES.renders}/${normalizedRenderJobId}/video.mp4`,
     thumbnailRelativePath: `${STORAGE_DIRECTORY_NAMES.thumbnails}/${normalizedRenderJobId}.jpg`,
+  });
+}
+
+export function createRenderDiagnosticOutputPath(
+  paths: StoragePaths,
+  renderJobId: string,
+  attempt: number,
+): RenderDiagnosticOutputPath {
+  const normalizedRenderJobId = normalizeRenderJobId(renderJobId);
+  const normalizedAttempt = normalizeRenderAttempt(attempt);
+  const relativePath = `${STORAGE_DIRECTORY_NAMES.logs}/${normalizedRenderJobId}/attempt-${normalizedAttempt}.jsonl`;
+
+  return Object.freeze({
+    absolutePath: safeJoin(paths.root, relativePath),
+    relativePath,
   });
 }
 

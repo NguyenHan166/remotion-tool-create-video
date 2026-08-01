@@ -4,6 +4,7 @@ import {
   cancelRender,
   createRender,
   fetchRenders,
+  getRenderDiagnosticUrl,
   getRenderDownloadUrl,
   getRenderPollingInterval,
   getRenderProgressPercent,
@@ -158,5 +159,6 @@ describe('render queue client', () => {
     expect(getRenderProgressPercent(Number.NaN)).toBe(0);
     expect(getRenderDownloadUrl(renderId)).toBe(`/api/v1/renders/${renderId}/download`);
     expect(getRenderThumbnailUrl(renderId)).toBe(`/api/v1/renders/${renderId}/thumbnail`);
+    expect(getRenderDiagnosticUrl(renderId)).toBe(`/api/v1/renders/${renderId}/diagnostic`);
   });
 });

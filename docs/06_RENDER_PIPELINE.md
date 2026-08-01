@@ -228,6 +228,14 @@ Store:
 - Browser log excerpt.
 - Diagnostic log output path.
 
+Render diagnostics are persisted as redacted JSONL `RenderOutput(LOG)` files under
+`logs/<renderJobId>/attempt-<n>.jsonl`. The worker includes request/job/worker context,
+stage transitions, Remotion browser logs and the classified failure. Absolute local
+paths and sensitive values are replaced before the file is written. The web API
+streams a failed job's diagnostic through `GET /api/v1/renders/:renderId/diagnostic`
+with a relative `Content-Disposition` filename; it never exposes the configured data
+directory.
+
 ## 11. Pseudocode
 
 ```ts

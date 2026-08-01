@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto';
 import {
   AssetNotFoundError,
   InvalidRenderStatusTransitionError,
@@ -22,6 +21,7 @@ import {
   type RenderOutputFileKind,
   type RenderOutputFileService,
 } from './file-service.js';
+import { getRequestId } from '../observability.js';
 
 type ErrorDetail = {
   path: string;
@@ -51,7 +51,7 @@ function createErrorResponse(
   message: string,
   details?: readonly ErrorDetail[],
 ): Response {
-  const requestId = request.headers.get('x-request-id') ?? randomUUID();
+  const requestId = getRequestId(request);
   const body: ErrorEnvelope = {
     error: {
       code,

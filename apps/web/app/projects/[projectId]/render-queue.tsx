@@ -9,6 +9,7 @@ import {
   createRender,
   fetchRenders,
   getRenderDownloadUrl,
+  getRenderDiagnosticUrl,
   getRenderPollingInterval,
   getRenderProgressPercent,
   getRenderThumbnailUrl,
@@ -149,6 +150,7 @@ function RenderJobCard({
   const progress = getRenderProgressPercent(job.progress);
   const video = job.outputs.find((output) => output.kind === 'VIDEO');
   const thumbnail = job.outputs.find((output) => output.kind === 'THUMBNAIL');
+  const diagnostic = job.outputs.find((output) => output.kind === 'LOG');
   const canCancel = isActiveRenderStatus(job.status) && job.status !== 'CANCEL_REQUESTED';
   const canRetry = job.status === 'FAILED' || job.status === 'CANCELLED';
 
@@ -246,6 +248,15 @@ function RenderJobCard({
               className="rounded-lg border border-white/10 px-3 py-2 text-[11px] font-semibold text-slate-300 transition hover:bg-white/5"
             >
               Tải thumbnail
+            </a>
+          ) : null}
+          {diagnostic !== undefined ? (
+            <a
+              href={getRenderDiagnosticUrl(job.id)}
+              download={diagnostic.fileName}
+              className="rounded-lg border border-rose-400/20 px-3 py-2 text-[11px] font-semibold text-rose-200 transition hover:bg-rose-400/10"
+            >
+              Táº£i diagnostics
             </a>
           ) : null}
           {canCancel ? (

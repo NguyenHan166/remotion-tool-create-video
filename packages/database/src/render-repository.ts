@@ -61,6 +61,7 @@ export type RecordRenderFailureInput = RenderCancellationCheckInput & {
   errorMessage: string;
   technicalError: string;
   transient: boolean;
+  diagnostic?: Omit<CreateRenderOutputInput, 'renderJobId'>;
   failedAt?: Date;
   retryAt?: Date;
 };
@@ -740,6 +741,7 @@ export class PrismaRenderJobRepository implements RenderJobRepository {
     errorMessage,
     technicalError,
     transient,
+    diagnostic,
     failedAt = new Date(),
     retryAt = failedAt,
   }: RecordRenderFailureInput): Promise<RenderFailureDisposition> {
@@ -761,6 +763,25 @@ export class PrismaRenderJobRepository implements RenderJobRepository {
       throw new RangeError(
         'Render failure timestamps must be valid and retry must not be earlier.',
       );
+    }
+
+    if (diagnostic !== undefined) {
+      if (diagnostic.kind !== 'LOG') {
+        throw new RangeError('Render failure diagnostics must use the LOG output kind.');
+      }
+
+      if (
+        !diagnostic.relativePath.startsWith(`logs/${renderJobId}/`) ||
+        /^[a-zA-Z]:[\\/]/u.test(diagnostic.relativePath) ||
+        diagnostic.relativePath.startsWith('/') ||
+        diagnostic.relativePath.includes('..')
+      ) {
+        throw new RangeError('Render failure diagnostic path must be a relative logs path.');
+      }
+
+      if (!Number.isSafeInteger(Number(diagnostic.sizeBytes)) || diagnostic.sizeBytes < 0n) {
+        throw new RangeError('Render failure diagnostic size must be a non-negative safe integer.');
+      }
     }
 
     return this.#database.$transaction(async (transaction) => {
@@ -796,6 +817,25 @@ export class PrismaRenderJobRepository implements RenderJobRepository {
       }
 
       const shouldRetry = transient && job.attempt < job.maxAttempts;
+
+      if (diagnostic !== undefined) {
+        await transaction.renderOutput.create({
+          data: {
+            renderJobId,
+            kind: diagnostic.kind,
+            relativePath: diagnostic.relativePath,
+            fileName: diagnostic.fileName,
+            mimeType: diagnostic.mimeType,
+            sizeBytes: diagnostic.sizeBytes,
+            ...(diagnostic.id === undefined ? {} : { id: diagnostic.id }),
+            ...(diagnostic.width === undefined ? {} : { width: diagnostic.width }),
+            ...(diagnostic.height === undefined ? {} : { height: diagnostic.height }),
+            ...(diagnostic.durationMs === undefined ? {} : { durationMs: diagnostic.durationMs }),
+            ...(diagnostic.metadata === undefined ? {} : { metadata: diagnostic.metadata }),
+          },
+        });
+      }
+
       const updated = await transaction.renderJob.update({
         where: { id: renderJobId },
         data: shouldRetry

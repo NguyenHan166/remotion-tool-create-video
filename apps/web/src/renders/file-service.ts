@@ -5,7 +5,7 @@ import {
   type StoragePaths,
 } from '@hansys/storage';
 
-export type RenderOutputFileKind = Extract<OutputKind, 'VIDEO' | 'THUMBNAIL'>;
+export type RenderOutputFileKind = Extract<OutputKind, 'VIDEO' | 'THUMBNAIL' | 'LOG'>;
 
 export type RenderOutputFileStreamResponse = Readonly<{
   status: 200 | 206;
@@ -50,8 +50,13 @@ function contentDisposition(fileName: string, kind: RenderOutputFileKind): strin
       .normalize('NFKD')
       .replace(/[^\x20-\x7E]/gu, '')
       .replace(/["\\\r\n]/gu, '_')
-      .trim() || (kind === 'VIDEO' ? 'video.mp4' : 'thumbnail.jpg');
-  const disposition = kind === 'VIDEO' ? 'attachment' : 'inline';
+      .trim() ||
+    (kind === 'VIDEO'
+      ? 'video.mp4'
+      : kind === 'THUMBNAIL'
+        ? 'thumbnail.jpg'
+        : 'render-diagnostic.jsonl');
+  const disposition = kind === 'THUMBNAIL' ? 'inline' : 'attachment';
 
   return `${disposition}; filename="${fallback}"; filename*=UTF-8''${encodeURIComponent(fileName)}`;
 }
@@ -76,7 +81,19 @@ export class DefaultRenderOutputFileService implements RenderOutputFileService {
       throw new RenderOutputFileNotFoundError();
     }
 
-    if (job.status !== 'COMPLETED') {
+    const diagnosticAvailableStatuses = [
+      'QUEUED',
+      'PREPARING',
+      'BUNDLING',
+      'RENDERING',
+      'ENCODING',
+      'FAILED',
+    ] as const;
+
+    if (
+      job.status !== 'COMPLETED' &&
+      !(kind === 'LOG' && diagnosticAvailableStatuses.some((status) => status === job.status))
+    ) {
       throw new RenderOutputNotReadyError();
     }
 
@@ -87,7 +104,11 @@ export class DefaultRenderOutputFileService implements RenderOutputFileService {
     }
 
     const expectedPrefix =
-      kind === 'VIDEO' ? `renders/${renderJobId}/` : `thumbnails/${renderJobId}.`;
+      kind === 'VIDEO'
+        ? `renders/${renderJobId}/`
+        : kind === 'THUMBNAIL'
+          ? `thumbnails/${renderJobId}.`
+          : `logs/${renderJobId}/`;
 
     if (!output.relativePath.startsWith(expectedPrefix)) {
       throw new RenderOutputFileNotFoundError();

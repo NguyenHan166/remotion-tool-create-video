@@ -13,6 +13,7 @@ export type PersistRenderFailureOptions = {
   job: Pick<RenderJobRecord, 'id' | 'attempt'>;
   workerId: string;
   error: unknown;
+  diagnostic?: RecordRenderFailureInput['diagnostic'];
   recordFailure: (input: RecordRenderFailureInput) => Promise<RenderFailureDisposition>;
   now?: () => Date;
 };
@@ -26,6 +27,7 @@ export async function persistRenderFailure({
   job,
   workerId,
   error,
+  diagnostic,
   recordFailure,
   now = () => new Date(),
 }: PersistRenderFailureOptions): Promise<PersistedRenderFailure> {
@@ -39,6 +41,7 @@ export async function persistRenderFailure({
     errorMessage: failure.safeMessage,
     technicalError: failure.technicalError,
     transient: failure.transient,
+    ...(diagnostic === undefined ? {} : { diagnostic }),
     failedAt,
     retryAt,
   });

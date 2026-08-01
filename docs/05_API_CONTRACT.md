@@ -358,6 +358,7 @@ This may be implemented after the core render flow.
 
 - Every endpoint has integration tests.
 - Every mutation emits a request ID in logs.
+- Every API response includes `X-Request-ID`; callers may provide a validated `x-request-id`.
 - No endpoint returns absolute local paths.
 - No API handler calls Remotion renderer.
 - Download file names are sanitized.

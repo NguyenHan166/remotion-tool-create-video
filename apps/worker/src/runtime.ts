@@ -16,9 +16,11 @@ import {
   removeRenderJobTempDirectory,
   resolveStoredAssetPath,
 } from '@hansys/storage';
+import { createStructuredLogger } from '@hansys/shared/observability';
 import { overrideVideoWebpackConfig } from '@hansys/video/bundler-config';
 import { bundle } from '@remotion/bundler';
 import { makeCancelSignal, renderMedia, renderStill, selectComposition } from '@remotion/renderer';
+import type { BrowserLog } from '@remotion/renderer';
 import { WorkerAssetServer } from './asset-server.js';
 import { PersistentRemotionBundleCache, computeRemotionBundleKey } from './bundle-cache.js';
 import { database } from './database.js';
@@ -35,6 +37,7 @@ import { RenderPipelineError, classifyRenderFailure } from './render-errors.js';
 import { persistRenderFailure } from './render-failure-runtime.js';
 import { renderH264Media } from './render-media.js';
 import { probeRenderedVideo, renderThumbnail } from './render-finalization.js';
+import { persistRenderDiagnostics, RenderDiagnostics } from './render-diagnostics.js';
 import { storagePaths } from './storage.js';
 
 const require = createRequire(import.meta.url);
@@ -73,6 +76,15 @@ export async function getOrCreateRemotionBundle(): Promise<{
 }
 
 export const workerId = `${hostname()}:${process.pid}`;
+export const workerLogger = createStructuredLogger({
+  context: {
+    service: 'render-worker',
+    workerId,
+    appVersion: workerServerEnvironment.APP_VERSION,
+    remotionVersion: rendererManifest.version,
+  },
+});
+const diagnosticsByJob = new Map<string, RenderDiagnostics>();
 
 export const workerLifecycle = new WorkerLifecycle({
   workerId,
@@ -99,7 +111,7 @@ export const workerLifecycle = new WorkerLifecycle({
     });
 
     if (recovery.retriedJobIds.length > 0 || recovery.failedJobIds.length > 0) {
-      console.info('Recovered stale render jobs', recovery);
+      workerLogger.info('render.stale_jobs_recovered', recovery);
     }
   },
   staleRecoveryIntervalMs: Math.max(
@@ -108,6 +120,28 @@ export const workerLifecycle = new WorkerLifecycle({
   ),
   claimNext: (claimingWorkerId) => renderJobRepository.claimNext(claimingWorkerId),
   executeJob: async (job, { signal }) => {
+    const diagnostics = new RenderDiagnostics({
+      renderJobId: job.id,
+      workerId,
+      attempt: job.attempt,
+    });
+    diagnosticsByJob.set(job.id, diagnostics);
+    const jobLogger = workerLogger.child({
+      jobId: job.id,
+      projectId: job.projectId,
+      revisionId: job.revisionId,
+      attempt: job.attempt,
+    });
+    const captureBrowserLog = (log: BrowserLog): void => {
+      jobLogger.warn('remotion.browser_log', {
+        browser: {
+          type: log.type,
+          text: log.text,
+          stackTrace: log.stackTrace,
+        },
+      });
+      diagnostics.captureBrowserLog(log);
+    };
     const attemptPaths = await initializeRenderJobAttempt(storagePaths, job.id);
     const remotionCancellation = makeCancelSignal();
     const cancellationMonitor = new RenderCancellationMonitor({
@@ -171,7 +205,7 @@ export const workerLifecycle = new WorkerLifecycle({
           },
           select: async (options) => {
             try {
-              return await selectComposition(options);
+              return await selectComposition({ ...options, onBrowserLog: captureBrowserLog });
             } catch (cause) {
               const failure = classifyRenderFailure(cause);
 
@@ -191,6 +225,7 @@ export const workerLifecycle = new WorkerLifecycle({
           },
           onStage: async (stage) => {
             await cancellationMonitor.check();
+            diagnostics.capture(jobLogger.info('render.stage', { stage }));
             await renderJobRepository.updateProgress({
               renderJobId: job.id,
               workerId,
@@ -204,10 +239,13 @@ export const workerLifecycle = new WorkerLifecycle({
           },
         });
 
-        console.info(
-          `Selected ${prepared.composition.id} for render job ${job.id} ` +
-            `(${prepared.composition.width}x${prepared.composition.height}, ` +
-            `${prepared.composition.durationInFrames} frames).`,
+        diagnostics.capture(
+          jobLogger.info('render.composition_selected', {
+            compositionId: prepared.composition.id,
+            width: prepared.composition.width,
+            height: prepared.composition.height,
+            durationInFrames: prepared.composition.durationInFrames,
+          }),
         );
         await renderH264Media({
           preset: job.preset,
@@ -219,6 +257,7 @@ export const workerLifecycle = new WorkerLifecycle({
           muted: prepared.inputProps.project.export.muted,
           cancelSignal: remotionCancellation.cancelSignal,
           render: renderMedia,
+          onBrowserLog: captureBrowserLog,
           writeProgress: (progress) =>
             renderJobRepository.updateProgress({
               renderJobId: job.id,
@@ -226,7 +265,12 @@ export const workerLifecycle = new WorkerLifecycle({
               ...progress,
             }),
         });
-        console.info(`Rendered H.264 media for render job ${job.id} to ${attemptPaths.video}.`);
+        diagnostics.capture(
+          jobLogger.info('render.media_rendered', {
+            codec: 'h264',
+            output: 'temporary-video',
+          }),
+        );
 
         await cancellationMonitor.check();
         await renderJobRepository.updateProgress({
@@ -253,6 +297,7 @@ export const workerLifecycle = new WorkerLifecycle({
           inputProps: prepared.inputProps,
           cancelSignal: remotionCancellation.cancelSignal,
           render: renderStill,
+          onBrowserLog: captureBrowserLog,
         });
 
         await cancellationMonitor.check();
@@ -299,7 +344,7 @@ export const workerLifecycle = new WorkerLifecycle({
           throw error;
         }
 
-        console.info(`Finalized video and thumbnail outputs for render job ${job.id}.`);
+        diagnostics.capture(jobLogger.info('render.outputs_finalized'));
       },
       cleanup: async () => {
         let cleanupError: unknown;
@@ -321,7 +366,7 @@ export const workerLifecycle = new WorkerLifecycle({
             throw cleanupError;
           }
 
-          console.warn(`Could not fully clean up completed render job ${job.id}.`, cleanupError);
+          diagnostics.capture(jobLogger.warn('render.cleanup_incomplete', {}, cleanupError));
         }
       },
       completeCancellation: async () => {
@@ -333,31 +378,65 @@ export const workerLifecycle = new WorkerLifecycle({
     });
 
     if (outcome === 'CANCELLED') {
-      console.info(`Cancelled render job ${job.id}.`);
+      diagnostics.capture(jobLogger.info('render.cancelled'));
     }
+
+    diagnosticsByJob.delete(job.id);
   },
   writeHeartbeat: createPrismaWorkerHeartbeatWriter(database),
   onPollError: (error) => {
-    console.error('Worker queue polling failed', error);
+    workerLogger.error('worker.poll_failed', {}, error);
   },
   onJobError: async (job, error) => {
-    const { failure, disposition } = await persistRenderFailure({
-      job,
-      workerId,
-      error,
-      recordFailure: (input) => renderJobRepository.recordFailure(input),
+    const diagnostics = diagnosticsByJob.get(job.id);
+    const jobLogger = workerLogger.child({
+      jobId: job.id,
+      projectId: job.projectId,
+      revisionId: job.revisionId,
+      attempt: job.attempt,
     });
-    console.error(
-      `Render job ${job.id} ${disposition.action === 'RETRY_QUEUED' ? 'will retry' : 'failed'} ` +
-        `with ${failure.code}.`,
-      error,
-    );
+
+    try {
+      diagnostics?.captureFailure(error);
+      let diagnostic;
+
+      if (diagnostics !== undefined) {
+        try {
+          diagnostic = await persistRenderDiagnostics(
+            storagePaths,
+            { renderJobId: job.id, workerId, attempt: job.attempt },
+            diagnostics,
+          );
+        } catch (diagnosticError) {
+          jobLogger.error('render.diagnostic_write_failed', {}, diagnosticError);
+        }
+      }
+
+      const { failure, disposition } = await persistRenderFailure({
+        job,
+        workerId,
+        error,
+        ...(diagnostic === undefined ? {} : { diagnostic }),
+        recordFailure: (input) => renderJobRepository.recordFailure(input),
+      });
+      jobLogger.error(
+        'render.job_failed',
+        {
+          failureCode: failure.code,
+          disposition: disposition.action,
+          diagnosticPath: diagnostic?.relativePath,
+        },
+        error,
+      );
+    } finally {
+      diagnosticsByJob.delete(job.id);
+    }
   },
   onHeartbeatError: (error) => {
-    console.error('Failed to publish worker heartbeat', error);
+    workerLogger.error('worker.heartbeat_failed', {}, error);
   },
   onShutdownTimeout: async (jobIds) => {
-    console.warn(`Worker shutdown timed out; cancellation requested for: ${jobIds.join(', ')}`);
+    workerLogger.warn('worker.shutdown_timeout', { activeJobIds: jobIds });
     await Promise.all(
       jobIds.map((renderJobId) => renderJobRepository.requestCancellation(renderJobId)),
     );

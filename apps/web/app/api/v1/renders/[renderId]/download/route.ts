@@ -1,7 +1,8 @@
 import { createRenderOutputFileHandlers } from '../../../../../../src/renders/handlers.js';
+import { withRequestLogging } from '../../../../../../src/observability.js';
 import { renderOutputFileService } from '../../../../../../src/renders/runtime.js';
 
 const handlers = createRenderOutputFileHandlers(renderOutputFileService, 'VIDEO');
 
 export const dynamic = 'force-dynamic';
-export const GET = handlers.GET;
+export const GET = withRequestLogging('renders.download', handlers.GET);

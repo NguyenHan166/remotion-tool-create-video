@@ -167,6 +167,10 @@ export function getRenderThumbnailUrl(renderId: string): string {
   return `/api/v1/renders/${encodeURIComponent(renderId)}/thumbnail`;
 }
 
+export function getRenderDiagnosticUrl(renderId: string): string {
+  return `/api/v1/renders/${encodeURIComponent(renderId)}/diagnostic`;
+}
+
 export function isActiveRenderStatus(status: RenderStatus): boolean {
   return ['QUEUED', 'PREPARING', 'BUNDLING', 'RENDERING', 'ENCODING', 'CANCEL_REQUESTED'].includes(
     status,

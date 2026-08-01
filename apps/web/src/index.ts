@@ -96,6 +96,7 @@ export {
   createRender,
   fetchRenders,
   getRenderDownloadUrl,
+  getRenderDiagnosticUrl,
   getRenderPollingInterval,
   getRenderProgressPercent,
   getRenderThumbnailUrl,
@@ -109,3 +110,9 @@ export {
   type RenderStatus,
 } from './renders/client.js';
 export { storagePaths } from './storage.js';
+export {
+  createRequestLogger,
+  getRequestId,
+  webLogger,
+  withRequestLogging,
+} from './observability.js';
