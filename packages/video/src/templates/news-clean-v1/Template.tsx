@@ -1,6 +1,7 @@
 import { validateNewsCleanV1, type TemplateComponentProps } from '@hansys/template-registry';
 import { AbsoluteFill, Series } from 'remotion';
 import { InvalidTemplateProjectError } from './errors.js';
+import { BackgroundMusicLayer } from './BackgroundMusicLayer.js';
 import { CaptionLayer } from './CaptionLayer.js';
 import { SceneRenderer } from './SceneRenderer.js';
 import { SharedLayers } from './components.js';
@@ -38,6 +39,7 @@ export function NewsCleanV1Template({ project, assets }: TemplateComponentProps)
       <SharedLayers assets={assets} durationInFrames={durationInFrames} project={project} />
       <CaptionLayer project={project} />
       <VoiceoverLayer assets={assets} project={project} />
+      <BackgroundMusicLayer assets={assets} durationInFrames={durationInFrames} project={project} />
     </AbsoluteFill>
   );
 }

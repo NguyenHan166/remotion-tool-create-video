@@ -282,6 +282,34 @@ test.describe('project editor preview', () => {
     });
   });
 
+  test('configures looping background music with valid fades in the shared preview draft', async ({
+    page,
+  }) => {
+    const autosaveRequests = await mockAutosavingProject(
+      page,
+      createProjectPayload('Background Music Project'),
+    );
+
+    await page.goto(`/projects/${projectId}`);
+    await page.getByLabel('Tệp nhạc nền').selectOption('99999999-9999-4999-8999-999999999999');
+    await page.getByLabel('Âm lượng nhạc nền').press('ArrowLeft');
+    await page.getByLabel('Bắt đầu nhạc nền (frame)').fill('24');
+    await page.getByLabel('Fade in nhạc nền (frame)').fill('30');
+    await page.getByLabel('Fade out nhạc nền (frame)').fill('20');
+    await page.getByLabel('Lặp lại nhạc nền').uncheck();
+
+    await expect(page.getByTestId('autosave-status')).toHaveAttribute('data-phase', 'saved');
+    expect(autosaveRequests.length).toBeGreaterThan(0);
+    expect(autosaveRequests.at(-1)?.document.audio.backgroundMusic).toEqual({
+      assetId: '99999999-9999-4999-8999-999999999999',
+      fadeInFrames: 30,
+      fadeOutFrames: 20,
+      loop: false,
+      startAtFrame: 24,
+      volume: 0.2,
+    });
+  });
+
   test('seeks exact scene boundaries and keeps the active strip item in sync', async ({ page }) => {
     const autosaveRequests = await mockAutosavingProject(
       page,

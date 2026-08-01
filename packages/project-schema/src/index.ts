@@ -328,6 +328,26 @@ export const ProjectDocumentV1Schema = z
         message: `Enabled scenes must not exceed ${MAX_PROJECT_DURATION_SECONDS} seconds`,
       });
     }
+
+    const backgroundMusic = project.audio.backgroundMusic;
+
+    if (backgroundMusic !== undefined) {
+      const availableFrames = totalDurationInFrames - backgroundMusic.startAtFrame;
+
+      if (availableFrames <= 0) {
+        context.addIssue({
+          code: 'custom',
+          path: ['audio', 'backgroundMusic', 'startAtFrame'],
+          message: 'Background music must start before the project ends',
+        });
+      } else if (backgroundMusic.fadeInFrames + backgroundMusic.fadeOutFrames > availableFrames) {
+        context.addIssue({
+          code: 'custom',
+          path: ['audio', 'backgroundMusic', 'fadeOutFrames'],
+          message: 'Combined background music fades must not exceed its available duration',
+        });
+      }
+    }
   });
 
 export const ProjectDocumentSchema = ProjectDocumentV1Schema;

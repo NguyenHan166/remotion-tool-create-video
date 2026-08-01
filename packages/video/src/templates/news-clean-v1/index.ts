@@ -9,6 +9,7 @@ registerTemplateRenderer(NEWS_CLEAN_V1_ID, NewsCleanV1Template);
 
 export {
   InvalidTemplateProjectError,
+  MissingBackgroundMusicAssetError,
   MissingTemplateAssetError,
   MissingVoiceoverAssetError,
 } from './errors.js';
@@ -21,6 +22,12 @@ export {
   type CaptionPage,
   type CaptionWord,
 } from './CaptionLayer.js';
+export {
+  BackgroundMusicLayer,
+  getBackgroundMusicLayerConfig,
+  getBackgroundMusicVolume,
+  type BackgroundMusicLayerConfig,
+} from './BackgroundMusicLayer.js';
 export { NewsCleanV1Template } from './Template.js';
 export {
   getVoiceoverLayerConfig,

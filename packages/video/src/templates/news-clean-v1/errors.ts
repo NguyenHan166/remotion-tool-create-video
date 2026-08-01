@@ -22,6 +22,17 @@ export class MissingVoiceoverAssetError extends Error {
   }
 }
 
+export class MissingBackgroundMusicAssetError extends Error {
+  readonly code = 'TEMPLATE_ASSET_MISSING';
+  readonly assetId: string;
+
+  constructor(assetId: string) {
+    super(`Background music asset "${assetId}" is missing.`);
+    this.name = 'MissingBackgroundMusicAssetError';
+    this.assetId = assetId;
+  }
+}
+
 export class InvalidTemplateProjectError extends Error {
   readonly code = 'TEMPLATE_PROJECT_INVALID';
   readonly issues: readonly { code: string; path: string; message: string }[];

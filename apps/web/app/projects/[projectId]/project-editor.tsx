@@ -12,7 +12,7 @@ import {
   getResponsivePlayerMaxWidth,
   type ProjectDto,
 } from '../../../src/projects/client';
-import { setProjectVoiceover } from '../../../src/projects/audio';
+import { setProjectBackgroundMusic, setProjectVoiceover } from '../../../src/projects/audio';
 import {
   addScene,
   createSceneEditorDraftState,
@@ -35,6 +35,7 @@ import {
 import { useProjectAutosave } from '../../../src/projects/use-project-autosave';
 import { AutosaveStatus } from './autosave-status';
 import { CaptionEditor } from './caption-editor';
+import { BackgroundMusicEditor } from './background-music-editor';
 import { RenderQueue } from './render-queue';
 import { SceneInspector } from './scene-inspector';
 import { SceneList } from './scene-list';
@@ -378,6 +379,19 @@ function LoadedProjectEditor({
               updateEditor((current) => ({
                 ...current,
                 document: setProjectVoiceover(current.document, voiceover),
+              }));
+            }}
+          />
+
+          <BackgroundMusicEditor
+            backgroundMusic={draft.audio.backgroundMusic}
+            durationInFrames={durationInFrames}
+            fps={draft.composition.fps}
+            projectArchived={project.status === 'ARCHIVED'}
+            onChange={(backgroundMusic) => {
+              updateEditor((current) => ({
+                ...current,
+                document: setProjectBackgroundMusic(current.document, backgroundMusic),
               }));
             }}
           />
