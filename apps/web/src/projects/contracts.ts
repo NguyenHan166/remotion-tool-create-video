@@ -1,4 +1,4 @@
-import { PROJECT_SCENE_TYPES } from '@hansys/project-schema';
+import { CaptionConfigV1Schema, PROJECT_SCENE_TYPES } from '@hansys/project-schema';
 import { z } from 'zod';
 
 const framesPerSecondSchema = z.literal([24, 25, 30, 50, 60]);
@@ -64,6 +64,13 @@ export const scriptApplyRequestSchema = z.strictObject({
   scenes: z.array(scriptSceneDraftSchema).min(1).max(100),
 });
 
+export const updateCaptionsRequestSchema = z.strictObject({
+  expectedDraftVersion: z.int().min(1),
+  captions: CaptionConfigV1Schema,
+});
+
+export const importSrtVersionSchema = z.coerce.number().int().min(1);
+
 export const listProjectsQuerySchema = z.strictObject({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
@@ -77,4 +84,5 @@ export type CreateProjectRequest = z.infer<typeof createProjectRequestSchema>;
 export type UpdateProjectRequest = z.infer<typeof updateProjectRequestSchema>;
 export type ScriptPreviewRequest = z.infer<typeof scriptPreviewRequestSchema>;
 export type ScriptApplyRequest = z.infer<typeof scriptApplyRequestSchema>;
+export type UpdateCaptionsRequest = z.infer<typeof updateCaptionsRequestSchema>;
 export type ListProjectsQuery = z.infer<typeof listProjectsQuerySchema>;

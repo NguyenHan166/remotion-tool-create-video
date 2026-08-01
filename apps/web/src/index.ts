@@ -45,7 +45,9 @@ export {
 } from './assets/service.js';
 export {
   createProjectCollectionHandlers,
+  createProjectCaptionHandlers,
   createProjectResourceHandlers,
+  createProjectSrtImportHandlers,
   type ProjectRouteContext,
 } from './projects/handlers.js';
 export {
@@ -54,6 +56,8 @@ export {
   type ProjectResponse,
   type ProjectService,
   type ProjectSummaryResponse,
+  type ImportSrtCaptionsInput,
+  type ImportSrtCaptionsResponse,
 } from './projects/service.js';
 export {
   createTemplateCollectionHandlers,

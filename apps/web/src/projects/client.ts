@@ -1,6 +1,7 @@
 import {
   extractProjectAssetIds,
   type ProjectDocumentV1,
+  type CaptionConfigV1,
   type SceneV1,
 } from '@hansys/project-schema';
 import { type ResolvedAsset, type VideoProps } from '@hansys/video';
@@ -14,6 +15,17 @@ export type ProjectDto = {
   document: ProjectDocumentV1;
   createdAt: string;
   updatedAt: string;
+};
+
+export type SrtImportWarningDto = {
+  code: 'SRT_OVERLAP';
+  cueIndex: number;
+  message: string;
+};
+
+export type SrtImportDto = {
+  project: ProjectDto;
+  warnings: SrtImportWarningDto[];
 };
 
 type ErrorEnvelope = {
@@ -86,6 +98,49 @@ export async function saveProjectDraft(
       expectedDraftVersion,
       document,
     }),
+  });
+
+  if (!response.ok) {
+    throw await toApiError(response);
+  }
+
+  return (await response.json()) as ProjectDto;
+}
+
+export async function importSrtCaptions(
+  projectId: string,
+  expectedDraftVersion: number,
+  file: File,
+): Promise<SrtImportDto> {
+  const body = new FormData();
+  body.set('file', file);
+  body.set('expectedDraftVersion', String(expectedDraftVersion));
+  const response = await fetch(
+    `/api/v1/projects/${encodeURIComponent(projectId)}/captions/import-srt`,
+    {
+      method: 'POST',
+      body,
+    },
+  );
+
+  if (!response.ok) {
+    throw await toApiError(response);
+  }
+
+  return (await response.json()) as SrtImportDto;
+}
+
+export async function updateProjectCaptions(
+  projectId: string,
+  expectedDraftVersion: number,
+  captions: CaptionConfigV1,
+): Promise<ProjectDto> {
+  const response = await fetch(`/api/v1/projects/${encodeURIComponent(projectId)}/captions`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ expectedDraftVersion, captions }),
   });
 
   if (!response.ok) {

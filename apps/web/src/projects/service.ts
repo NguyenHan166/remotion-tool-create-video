@@ -11,9 +11,12 @@ import {
   extractProjectAssetIds,
   migrateProjectDocument,
   parseProjectDocument,
+  parseSrt,
+  type CaptionConfigV1,
   splitScriptIntoSceneDrafts,
   type ProjectDocumentV1,
   type ScriptSplitPreview,
+  type SrtParseWarning,
 } from '@hansys/project-schema';
 import {
   type CreateProjectRequest,
@@ -21,6 +24,7 @@ import {
   type ScriptApplyRequest,
   type ScriptPreviewRequest,
   type UpdateProjectRequest,
+  type UpdateCaptionsRequest,
 } from './contracts.js';
 
 export type ProjectResponse = {
@@ -59,6 +63,16 @@ export type ProjectRevisionResponse = {
   createdAt: string;
 };
 
+export type ImportSrtCaptionsInput = {
+  expectedDraftVersion: number;
+  source: string;
+};
+
+export type ImportSrtCaptionsResponse = {
+  project: ProjectResponse;
+  warnings: readonly SrtParseWarning[];
+};
+
 export interface ProjectService {
   create(input: CreateProjectRequest): Promise<ProjectResponse>;
   list(input: ListProjectsQuery): Promise<ProjectPageResponse>;
@@ -70,6 +84,11 @@ export interface ProjectService {
   listRevisions(projectId: string): Promise<ProjectRevisionResponse[]>;
   previewScript(projectId: string, input: ScriptPreviewRequest): Promise<ScriptSplitPreview>;
   applyScript(projectId: string, input: ScriptApplyRequest): Promise<ProjectResponse>;
+  updateCaptions(projectId: string, input: UpdateCaptionsRequest): Promise<ProjectResponse>;
+  importSrtCaptions(
+    projectId: string,
+    input: ImportSrtCaptionsInput,
+  ): Promise<ImportSrtCaptionsResponse>;
 }
 
 function toProjectResponse(project: Project): ProjectResponse {
@@ -245,5 +264,71 @@ export class DefaultProjectService implements ProjectService {
     });
 
     return toProjectResponse(updatedProject);
+  }
+
+  async updateCaptions(projectId: string, input: UpdateCaptionsRequest): Promise<ProjectResponse> {
+    const project = await this.#repository.findById(projectId);
+
+    if (project === null) {
+      throw new ProjectNotFoundError(projectId);
+    }
+
+    return toProjectResponse(
+      await this.#updateCaptionDocument(project, input.expectedDraftVersion, input.captions),
+    );
+  }
+
+  async importSrtCaptions(
+    projectId: string,
+    input: ImportSrtCaptionsInput,
+  ): Promise<ImportSrtCaptionsResponse> {
+    const project = await this.#repository.findById(projectId);
+
+    if (project === null) {
+      throw new ProjectNotFoundError(projectId);
+    }
+
+    const parsed = parseSrt(input.source);
+    const currentDocument = migrateProjectDocument(project.draftDocument);
+    const captions: CaptionConfigV1 = {
+      ...currentDocument.captions,
+      enabled: true,
+      source: 'srt',
+      entries: parsed.cues.map((cue) => ({
+        id: this.#createId(),
+        startMs: cue.startMs,
+        endMs: cue.endMs,
+        text: cue.text,
+      })),
+    };
+    const updated = await this.#updateCaptionDocument(
+      project,
+      input.expectedDraftVersion,
+      captions,
+    );
+
+    return {
+      project: toProjectResponse(updated),
+      warnings: parsed.warnings,
+    };
+  }
+
+  async #updateCaptionDocument(
+    project: Project,
+    expectedDraftVersion: number,
+    captions: CaptionConfigV1,
+  ): Promise<Project> {
+    const currentDocument = migrateProjectDocument(project.draftDocument);
+    const document = parseProjectDocument({
+      ...currentDocument,
+      captions,
+    });
+
+    return this.#repository.updateDraft({
+      projectId: project.id,
+      expectedDraftVersion,
+      draftDocument: document,
+      assetIds: extractProjectAssetIds(document),
+    });
   }
 }

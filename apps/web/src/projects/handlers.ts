@@ -8,6 +8,7 @@ import {
   InvalidProjectDocumentVersionError,
   ProjectDocumentMigrationError,
   ProjectDocumentValidationError,
+  SrtParseError,
   UnsupportedProjectDocumentVersionError,
 } from '@hansys/project-schema';
 import { type ZodError, type ZodIssue } from 'zod';
@@ -17,6 +18,8 @@ import {
   projectIdSchema,
   scriptApplyRequestSchema,
   scriptPreviewRequestSchema,
+  importSrtVersionSchema,
+  updateCaptionsRequestSchema,
   updateProjectRequestSchema,
 } from './contracts.js';
 import { type ProjectService } from './service.js';
@@ -73,6 +76,18 @@ function createErrorResponse(request: Request, options: ErrorResponseOptions): R
 }
 
 function handleProjectError(request: Request, error: unknown): Response {
+  if (error instanceof SrtParseError) {
+    return createErrorResponse(request, {
+      status: 400,
+      code: error.code,
+      message: error.message,
+      details: error.details.map((detail) => ({
+        path: `file.block.${detail.block}.line.${detail.line}`,
+        message: detail.message,
+      })),
+    });
+  }
+
   if (error instanceof AssetNotFoundError) {
     return createErrorResponse(request, {
       status: 404,
@@ -462,6 +477,144 @@ export function createProjectScriptApplyHandlers(service: ProjectService): {
       try {
         return Response.json(
           await service.applyScript(projectIdResult.projectId, requestResult.data),
+        );
+      } catch (error) {
+        return handleProjectError(request, error);
+      }
+    },
+  };
+}
+
+export function createProjectCaptionHandlers(service: ProjectService): {
+  PUT: (request: Request, context: ProjectRouteContext) => Promise<Response>;
+} {
+  return {
+    PUT: async (request, context) => {
+      const projectIdResult = await parseProjectId(request, context);
+
+      if (!projectIdResult.success) {
+        return projectIdResult.response;
+      }
+
+      const jsonResult = await readJsonRequest(request);
+
+      if (!jsonResult.success) {
+        return jsonResult.response;
+      }
+
+      const requestResult = updateCaptionsRequestSchema.safeParse(jsonResult.data);
+
+      if (!requestResult.success) {
+        return createErrorResponse(request, {
+          status: 400,
+          code: 'BAD_REQUEST',
+          message: 'Caption update request is invalid.',
+          details: formatZodIssues(requestResult.error),
+        });
+      }
+
+      try {
+        return Response.json(
+          await service.updateCaptions(projectIdResult.projectId, requestResult.data),
+        );
+      } catch (error) {
+        return handleProjectError(request, error);
+      }
+    },
+  };
+}
+
+const MAX_SRT_FILE_BYTES = 2_000_000;
+
+function invalidSrtUpload(request: Request, path: string, message: string): Response {
+  return createErrorResponse(request, {
+    status: 400,
+    code: 'BAD_REQUEST',
+    message: 'SRT import request is invalid.',
+    details: [{ path, message }],
+  });
+}
+
+export function createProjectSrtImportHandlers(service: ProjectService): {
+  POST: (request: Request, context: ProjectRouteContext) => Promise<Response>;
+} {
+  return {
+    POST: async (request, context) => {
+      const projectIdResult = await parseProjectId(request, context);
+
+      if (!projectIdResult.success) {
+        return projectIdResult.response;
+      }
+
+      if (
+        request.headers.get('content-type')?.toLowerCase().startsWith('multipart/form-data;') !==
+        true
+      ) {
+        return invalidSrtUpload(request, 'request', 'Content-Type must be multipart/form-data.');
+      }
+
+      let formData: FormData;
+
+      try {
+        formData = await request.formData();
+      } catch {
+        return invalidSrtUpload(request, 'request', 'Request body must be valid multipart data.');
+      }
+
+      const files = formData.getAll('file');
+
+      if (files.length !== 1 || !(files[0] instanceof File)) {
+        return invalidSrtUpload(request, 'file', 'Exactly one SRT file is required.');
+      }
+
+      const file = files[0];
+
+      if (!file.name.toLowerCase().endsWith('.srt')) {
+        return invalidSrtUpload(request, 'file', 'File name must use the .srt extension.');
+      }
+
+      if (file.size === 0 || file.size > MAX_SRT_FILE_BYTES) {
+        return invalidSrtUpload(
+          request,
+          'file',
+          `SRT file size must be from 1 to ${MAX_SRT_FILE_BYTES} bytes.`,
+        );
+      }
+
+      const versionValues = formData.getAll('expectedDraftVersion');
+
+      if (versionValues.length !== 1 || typeof versionValues[0] !== 'string') {
+        return invalidSrtUpload(
+          request,
+          'expectedDraftVersion',
+          'Expected draft version is required.',
+        );
+      }
+
+      const versionResult = importSrtVersionSchema.safeParse(versionValues[0]);
+
+      if (!versionResult.success) {
+        return invalidSrtUpload(
+          request,
+          'expectedDraftVersion',
+          versionResult.error.issues[0]?.message ?? 'Expected draft version is invalid.',
+        );
+      }
+
+      let source: string;
+
+      try {
+        source = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer());
+      } catch {
+        return invalidSrtUpload(request, 'file', 'SRT file must contain valid UTF-8 text.');
+      }
+
+      try {
+        return Response.json(
+          await service.importSrtCaptions(projectIdResult.projectId, {
+            expectedDraftVersion: versionResult.data,
+            source,
+          }),
         );
       } catch (error) {
         return handleProjectError(request, error);

@@ -9,6 +9,16 @@ export {
   type ProjectDocumentMigratorOptions,
   type ProjectMigration,
 } from './migration.js';
+export {
+  MAX_SRT_CHARACTERS,
+  MAX_SRT_CUES,
+  SrtParseError,
+  parseSrt,
+  type SrtCue,
+  type SrtParseDetail,
+  type SrtParseResult,
+  type SrtParseWarning,
+} from './srt.js';
 
 export const CURRENT_PROJECT_SCHEMA_VERSION = 1 as const;
 export const MAX_PROJECT_DURATION_SECONDS = 180;

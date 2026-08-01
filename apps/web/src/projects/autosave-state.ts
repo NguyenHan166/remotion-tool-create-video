@@ -42,6 +42,14 @@ export type AutosaveAction =
   | {
       type: 'use-remote';
       remoteDraftVersion: number;
+    }
+  | {
+      type: 'accept-server';
+      remoteDraftVersion: number;
+    }
+  | {
+      type: 'external-conflict';
+      message: string;
     };
 
 export function createAutosaveState(draftVersion: number): AutosaveState {
@@ -167,6 +175,26 @@ export function reduceAutosaveState(state: AutosaveState, action: AutosaveAction
         savedSequence: state.changeSequence,
         savingSequence: null,
         message: null,
+      };
+    }
+
+    case 'accept-server': {
+      return {
+        ...state,
+        phase: 'saved',
+        draftVersion: action.remoteDraftVersion,
+        savedSequence: state.changeSequence,
+        savingSequence: null,
+        message: null,
+      };
+    }
+
+    case 'external-conflict': {
+      return {
+        ...state,
+        phase: 'conflict',
+        savingSequence: null,
+        message: action.message,
       };
     }
   }

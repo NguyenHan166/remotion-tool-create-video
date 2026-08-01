@@ -33,6 +33,7 @@ import {
 } from '../../../src/projects/player-timeline';
 import { useProjectAutosave } from '../../../src/projects/use-project-autosave';
 import { AutosaveStatus } from './autosave-status';
+import { CaptionEditor } from './caption-editor';
 import { RenderQueue } from './render-queue';
 import { SceneInspector } from './scene-inspector';
 import { SceneList } from './scene-list';
@@ -349,6 +350,22 @@ function LoadedProjectEditor({
             }}
             onToggleMute={toggleMute}
             onTogglePlay={togglePlay}
+          />
+
+          <CaptionEditor
+            projectId={project.id}
+            captions={draft.captions}
+            autosave={autosave}
+            projectArchived={project.status === 'ARCHIVED'}
+            onChange={(captions) => {
+              updateEditor((current) => ({
+                ...current,
+                document: {
+                  ...current.document,
+                  captions,
+                },
+              }));
+            }}
           />
         </section>
 

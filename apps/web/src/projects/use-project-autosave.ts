@@ -31,6 +31,8 @@ export type ProjectAutosave = {
   reloadConflict: () => void;
   keepLocal: () => void;
   useRemote: () => void;
+  acceptServerProject: (project: ProjectDto) => void;
+  handleVersionConflict: (message: string) => void;
 };
 
 type UseProjectAutosaveOptions = {
@@ -227,9 +229,29 @@ export function useProjectAutosave({
     setConflict(idleConflict);
   }, [conflict, onUseRemote]);
 
+  const acceptServerProject = useCallback(
+    (project: ProjectDto) => {
+      onUseRemote(project);
+      dispatch({
+        type: 'accept-server',
+        remoteDraftVersion: project.draftVersion,
+      });
+      setConflict(idleConflict);
+    },
+    [onUseRemote],
+  );
+
   const retry = useCallback(() => {
     dispatch({ type: 'retry' });
   }, []);
+
+  const handleVersionConflict = useCallback(
+    (message: string) => {
+      dispatch({ type: 'external-conflict', message });
+      loadLatestProject();
+    },
+    [loadLatestProject],
+  );
 
   return {
     phase: state.phase,
@@ -240,5 +262,7 @@ export function useProjectAutosave({
     reloadConflict: loadLatestProject,
     keepLocal,
     useRemote,
+    acceptServerProject,
+    handleVersionConflict,
   };
 }

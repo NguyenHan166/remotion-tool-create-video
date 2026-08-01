@@ -3,7 +3,12 @@ import {
   createAutosaveState,
   reduceAutosaveState,
 } from '../apps/web/src/projects/autosave-state.js';
-import { ProjectApiError, saveProjectDraft } from '../apps/web/src/projects/client.js';
+import {
+  ProjectApiError,
+  importSrtCaptions,
+  saveProjectDraft,
+  updateProjectCaptions,
+} from '../apps/web/src/projects/client.js';
 import { STUDIO_PROJECT_FIXTURE } from '../packages/video/src/fixture.js';
 
 const projectId = '55555555-5555-4555-8555-555555555555';
@@ -136,6 +141,40 @@ describe('project autosave state', () => {
       message: null,
     });
   });
+
+  it('accepts a server-side caption import as the new saved draft version', () => {
+    const dirty = reduceAutosaveState(createAutosaveState(3), {
+      type: 'observe-change',
+      changeSequence: 1,
+    });
+    const accepted = reduceAutosaveState(dirty, {
+      type: 'accept-server',
+      remoteDraftVersion: 4,
+    });
+
+    expect(accepted).toMatchObject({
+      phase: 'saved',
+      draftVersion: 4,
+      changeSequence: 1,
+      savedSequence: 1,
+      savingSequence: null,
+    });
+  });
+
+  it('enters conflict recovery when a specialized optimistic update is stale', () => {
+    const state = createAutosaveState(3);
+    const conflict = reduceAutosaveState(state, {
+      type: 'external-conflict',
+      message: 'Expected version 3; current version is 4.',
+    });
+
+    expect(conflict).toMatchObject({
+      phase: 'conflict',
+      draftVersion: 3,
+      savingSequence: null,
+      message: 'Expected version 3; current version is 4.',
+    });
+  });
 });
 
 describe('project autosave client', () => {
@@ -208,6 +247,64 @@ describe('project autosave client', () => {
       status: 409,
       code: 'PROJECT_VERSION_CONFLICT',
       details: ['Expected version 1; current version is 2.'],
+    });
+  });
+
+  it('imports an SRT file with the optimistic draft version', async () => {
+    const responseBody = {
+      project: {
+        id: projectId,
+        name: 'Caption project',
+        description: null,
+        status: 'DRAFT',
+        draftVersion: 8,
+        document: STUDIO_PROJECT_FIXTURE,
+        createdAt: '2026-08-01T00:00:00.000Z',
+        updatedAt: '2026-08-01T00:00:01.000Z',
+      },
+      warnings: [],
+    };
+    const fetchMock = vi.fn(async (input: string | URL | Request, request?: RequestInit) => {
+      void input;
+      void request;
+      return Response.json(responseBody);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const file = new File(['1\n00:00:00,000 --> 00:00:01,000\nXin chào'], 'vi.srt');
+
+    await expect(importSrtCaptions(projectId, 7, file)).resolves.toEqual(responseBody);
+    const [url, request] = fetchMock.mock.calls[0]!;
+    expect(url).toBe(`/api/v1/projects/${projectId}/captions/import-srt`);
+    expect(request).toMatchObject({ method: 'POST' });
+    expect(request?.body).toBeInstanceOf(FormData);
+    expect((request?.body as FormData).get('file')).toBe(file);
+    expect((request?.body as FormData).get('expectedDraftVersion')).toBe('7');
+  });
+
+  it('PUTs only caption configuration with optimistic concurrency', async () => {
+    const project = {
+      id: projectId,
+      name: 'Caption project',
+      description: null,
+      status: 'DRAFT',
+      draftVersion: 9,
+      document: STUDIO_PROJECT_FIXTURE,
+      createdAt: '2026-08-01T00:00:00.000Z',
+      updatedAt: '2026-08-01T00:00:01.000Z',
+    };
+    const fetchMock = vi.fn(async () => Response.json(project));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(
+      updateProjectCaptions(projectId, 8, STUDIO_PROJECT_FIXTURE.captions),
+    ).resolves.toEqual(project);
+    expect(fetchMock).toHaveBeenCalledWith(`/api/v1/projects/${projectId}/captions`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        expectedDraftVersion: 8,
+        captions: STUDIO_PROJECT_FIXTURE.captions,
+      }),
     });
   });
 });
