@@ -117,6 +117,23 @@ MVP minimum:
 - Allow small encoding-independent pixel tolerance.
 - Review changes intentionally when templates change.
 
+The repository runs the approved-frame suite with `pnpm test:visual`. It renders the
+start, midpoint and end frame for `news-clean-v1`, `breaking-red-v1` and
+`warning-dark-v1`, then compares a 32 × 32 perceptual color sample and average hash
+against `tests/fixtures/visual-regression/approved.json`. Rendered PNGs are written
+under the ignored `test-results/visual-regression/` directory for review.
+
+When a template change is intentional:
+
+1. Run `pnpm test:visual:update` (or pass `-- --template <template-id>` to update one
+   template).
+2. Review the generated frames in `test-results/visual-regression/`.
+3. Commit the updated approved manifest together with the template change.
+
+The normal `pnpm test:visual` command never updates approvals. A missing or changed
+frame fails with the measured perceptual distance and points to the explicit update
+command, so visual changes cannot be silently accepted.
+
 ## 6. Failure tests
 
 Required:

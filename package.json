@@ -19,6 +19,8 @@
     "test:video:breaking": "node scripts/breaking-red-frame-smoke.mjs",
     "test:video:warning": "node scripts/warning-dark-frame-smoke.mjs",
     "test:video:theme": "node scripts/theme-template-frame-smoke.mjs",
+    "test:visual": "node scripts/visual-regression.mjs",
+    "test:visual:update": "node scripts/visual-regression.mjs --update",
     "typecheck": "turbo run typecheck && tsc --project tsconfig.json --noEmit"
   },
   "devDependencies": {
