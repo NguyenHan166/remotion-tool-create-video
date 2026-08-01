@@ -35,6 +35,8 @@ export const workerServerEnvironmentSchema = commonServerEnvironmentSchema.exten
     .default('50%'),
   RENDER_JOB_POLL_MS: positiveInteger.default(1000),
   RENDER_STALE_AFTER_MINUTES: positiveInteger.default(30),
+  STORAGE_RETENTION_DAYS: nonNegativeInteger.default(30),
+  STORAGE_CLEANUP_INTERVAL_MS: positiveInteger.default(6 * 60 * 60_000),
   WORKER_SHUTDOWN_TIMEOUT_MS: positiveInteger.default(30_000),
 });
 

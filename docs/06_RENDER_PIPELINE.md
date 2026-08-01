@@ -236,7 +236,16 @@ streams a failed job's diagnostic through `GET /api/v1/renders/:renderId/diagnos
 with a relative `Content-Disposition` filename; it never exposes the configured data
 directory.
 
-## 11. Pseudocode
+## 11. Storage retention
+
+The worker runs a retention pass on a configurable interval. It removes files older
+than `STORAGE_RETENTION_DAYS` from temporary attempts, diagnostics, bundle cache and
+render outputs while preserving active temporary job directories. Asset files are
+owned by the asset repository and are intentionally excluded from the scan. The
+same service is available through `pnpm cleanup -- --dry-run` and requires
+`--execute` before it mutates storage.
+
+## 12. Pseudocode
 
 ```ts
 async function executeJob(jobId: string, workerId: string) {
@@ -277,7 +286,7 @@ async function executeJob(jobId: string, workerId: string) {
 
 Codex must confirm the exact cancellation option name against the pinned Remotion type definitions.
 
-## 12. Bundle invalidation test
+## 13. Bundle invalidation test
 
 The test must prove:
 
@@ -286,7 +295,7 @@ The test must prove:
 3. Changing `pnpm-lock.yaml` changes the bundle key.
 4. A failed build does not become the final cache directory.
 
-## 13. Render smoke fixtures
+## 14. Render smoke fixtures
 
 Every template includes:
 

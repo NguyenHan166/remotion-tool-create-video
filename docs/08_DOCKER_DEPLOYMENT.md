@@ -42,6 +42,8 @@ Important:
 - `RENDER_FRAME_CONCURRENCY`
 - `RENDER_STALE_AFTER_MINUTES`
 - `RENDER_MAX_ATTEMPTS`
+- `STORAGE_RETENTION_DAYS`
+- `STORAGE_CLEANUP_INTERVAL_MS`
 
 ## 4. Production image
 
@@ -74,7 +76,24 @@ Runner requirements:
 
 Do not let both web and worker race to run migrations.
 
-## 6. Health
+## 6. Cleanup and retention
+
+The worker periodically removes expired files from `temp/`, `logs/`, `bundles/`,
+`renders/` and `thumbnails/`. The `assets/` directory is never scanned by the
+retention service. Active render temporary directories can be protected while
+cleanup runs.
+
+Cleanup is dry-run by default:
+
+```bash
+pnpm cleanup -- --dry-run
+pnpm cleanup -- --execute
+```
+
+Use `--retention-days <days>` for a one-off policy override. Review the dry-run
+before enabling deletion in an operational environment.
+
+## 7. Health
 
 Web:
 
@@ -94,7 +113,7 @@ Worker heartbeat fields:
 - browser available.
 - writable storage.
 
-## 7. Upgrade
+## 8. Upgrade
 
 ```bash
 docker compose pull
@@ -111,7 +130,7 @@ Before upgrade:
 
 Use version tags for rollback, not only `latest`.
 
-## 8. Backup
+## 9. Backup
 
 Database:
 
@@ -129,7 +148,7 @@ Data:
 
 The project requires both database and data volume for a complete restore.
 
-## 9. Restore
+## 10. Restore
 
 1. Stop web and worker.
 2. Restore PostgreSQL.
@@ -140,7 +159,7 @@ The project requires both database and data volume for a complete restore.
 7. Run health checks.
 8. Open one project and test a draft render.
 
-## 10. Docker Hub tags
+## 11. Docker Hub tags
 
 - `gh-<short-sha>`
 - `v0.1.0`
@@ -153,7 +172,7 @@ APP_IMAGE=yourname/hansys-video-studio
 APP_VERSION=v0.1.0
 ```
 
-## 11. CI image gates
+## 12. CI image gates
 
 Before publish:
 
@@ -165,7 +184,7 @@ Before publish:
 - container health test.
 - compose configuration validation.
 
-## 12. Windows notes
+## 13. Windows notes
 
 - Store active data in Docker named volumes rather than Windows bind mounts for better file behavior.
 - Downloads are served through the browser.

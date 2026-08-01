@@ -23,6 +23,7 @@ import { makeCancelSignal, renderMedia, renderStill, selectComposition } from '@
 import type { BrowserLog } from '@remotion/renderer';
 import { WorkerAssetServer } from './asset-server.js';
 import { PersistentRemotionBundleCache, computeRemotionBundleKey } from './bundle-cache.js';
+import { StorageRetentionService } from './cleanup.js';
 import { database } from './database.js';
 import { checkCommandAvailable, checkRemotionBrowser, runWorkerDoctor } from './doctor.js';
 import { workerServerEnvironment } from './environment.js';
@@ -85,6 +86,11 @@ export const workerLogger = createStructuredLogger({
   },
 });
 const diagnosticsByJob = new Map<string, RenderDiagnostics>();
+const storageRetentionService = new StorageRetentionService({
+  paths: storagePaths,
+  retentionDays: workerServerEnvironment.STORAGE_RETENTION_DAYS,
+  logger: workerLogger.child({ service: 'storage-retention' }),
+});
 
 export const workerLifecycle = new WorkerLifecycle({
   workerId,
@@ -118,6 +124,30 @@ export const workerLifecycle = new WorkerLifecycle({
     60_000,
     Math.floor((workerServerEnvironment.RENDER_STALE_AFTER_MINUTES * 60_000) / 2),
   ),
+  maintenanceIntervalMs: workerServerEnvironment.STORAGE_CLEANUP_INTERVAL_MS,
+  runMaintenance: async (activeJobIds) => {
+    const [activeJobs, referencedOutputs] = await Promise.all([
+      database.renderJob.findMany({
+        where: {
+          status: {
+            in: ['PREPARING', 'BUNDLING', 'RENDERING', 'ENCODING', 'CANCEL_REQUESTED'],
+          },
+        },
+        select: {
+          id: true,
+        },
+      }),
+      database.renderOutput.findMany({
+        select: {
+          relativePath: true,
+        },
+      }),
+    ]);
+    await storageRetentionService.run({
+      protectedTempJobIds: [...new Set([...activeJobIds, ...activeJobs.map(({ id }) => id)])],
+      protectedRelativePaths: referencedOutputs.map(({ relativePath }) => relativePath),
+    });
+  },
   claimNext: (claimingWorkerId) => renderJobRepository.claimNext(claimingWorkerId),
   executeJob: async (job, { signal }) => {
     const diagnostics = new RenderDiagnostics({

@@ -231,6 +231,27 @@ describe('worker lifecycle', () => {
     await lifecycle.shutdown();
   });
 
+  it('runs optional storage maintenance before polling and on its interval', async () => {
+    vi.useFakeTimers();
+    const runMaintenance = vi.fn().mockResolvedValue(undefined);
+    const claimNext = vi.fn().mockResolvedValue(null);
+    const { lifecycle } = createLifecycle({
+      claimNext,
+      pollIntervalMs: 25,
+      maintenanceIntervalMs: 100,
+      runMaintenance,
+    });
+
+    await lifecycle.start();
+    await flushUntil(() => claimNext.mock.calls.length > 0);
+
+    expect(runMaintenance).toHaveBeenCalledOnce();
+    await vi.advanceTimersByTimeAsync(100);
+    expect(runMaintenance).toHaveBeenCalledTimes(2);
+
+    await lifecycle.shutdown();
+  });
+
   it('does not heartbeat or poll when startup recovery fails', async () => {
     const recoveryError = new Error('stale cleanup failed');
     const claimNext = vi.fn().mockResolvedValue(null);

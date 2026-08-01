@@ -9,6 +9,7 @@ import { assertWorkerDoctorHealthy, type WorkerDoctorReport } from './doctor.js'
 
 export const DEFAULT_WORKER_SHUTDOWN_TIMEOUT_MS = 30_000;
 export const DEFAULT_STALE_RECOVERY_INTERVAL_MS = 60_000;
+export const DEFAULT_MAINTENANCE_INTERVAL_MS = 6 * 60 * 60_000;
 
 export type WorkerLifecycleState = 'CREATED' | 'STARTING' | 'RUNNING' | 'STOPPING' | 'STOPPED';
 
@@ -25,8 +26,10 @@ export type WorkerLifecycleOptions = {
   shutdownTimeoutMs?: number;
   heartbeatIntervalMs?: number;
   staleRecoveryIntervalMs?: number;
+  maintenanceIntervalMs?: number;
   runDoctor: () => Promise<WorkerDoctorReport>;
   recoverStaleJobs?: () => Promise<void>;
+  runMaintenance?: (activeJobIds: readonly string[]) => Promise<void>;
   claimNext: (workerId: string) => Promise<RenderJobRecord | null>;
   executeJob: (job: RenderJobRecord, context: WorkerExecutionContext) => Promise<void>;
   writeHeartbeat: WorkerHeartbeatWriter;
@@ -56,8 +59,10 @@ export class WorkerLifecycle {
   readonly #pollIntervalMs: number;
   readonly #shutdownTimeoutMs: number;
   readonly #staleRecoveryIntervalMs: number;
+  readonly #maintenanceIntervalMs: number;
   readonly #runDoctor: () => Promise<WorkerDoctorReport>;
   readonly #recoverStaleJobs: (() => Promise<void>) | undefined;
+  readonly #runMaintenance: ((activeJobIds: readonly string[]) => Promise<void>) | undefined;
   readonly #claimNext: (workerId: string) => Promise<RenderJobRecord | null>;
   readonly #executeJob: WorkerLifecycleOptions['executeJob'];
   readonly #writeHeartbeat: WorkerHeartbeatWriter;
@@ -75,6 +80,7 @@ export class WorkerLifecycle {
   #shutdownPromise: Promise<void> | null = null;
   #pollTimer: ReturnType<typeof setTimeout> | undefined;
   #nextStaleRecoveryAt = 0;
+  #nextMaintenanceAt = 0;
   #wakePoll: (() => void) | undefined;
   #resolveStopped!: () => void;
   readonly #stopped = new Promise<void>((resolve) => {
@@ -90,8 +96,10 @@ export class WorkerLifecycle {
     shutdownTimeoutMs = DEFAULT_WORKER_SHUTDOWN_TIMEOUT_MS,
     heartbeatIntervalMs = DEFAULT_HEARTBEAT_INTERVAL_MS,
     staleRecoveryIntervalMs = DEFAULT_STALE_RECOVERY_INTERVAL_MS,
+    maintenanceIntervalMs = DEFAULT_MAINTENANCE_INTERVAL_MS,
     runDoctor,
     recoverStaleJobs,
+    runMaintenance,
     claimNext,
     executeJob,
     writeHeartbeat,
@@ -106,6 +114,7 @@ export class WorkerLifecycle {
     assertPositiveInteger(shutdownTimeoutMs, 'Shutdown timeout');
     assertPositiveInteger(heartbeatIntervalMs, 'Heartbeat interval');
     assertPositiveInteger(staleRecoveryIntervalMs, 'Stale recovery interval');
+    assertPositiveInteger(maintenanceIntervalMs, 'Maintenance interval');
 
     this.#workerId = workerId;
     this.#appVersion = appVersion;
@@ -114,8 +123,10 @@ export class WorkerLifecycle {
     this.#pollIntervalMs = pollIntervalMs;
     this.#shutdownTimeoutMs = shutdownTimeoutMs;
     this.#staleRecoveryIntervalMs = staleRecoveryIntervalMs;
+    this.#maintenanceIntervalMs = maintenanceIntervalMs;
     this.#runDoctor = runDoctor;
     this.#recoverStaleJobs = recoverStaleJobs;
+    this.#runMaintenance = runMaintenance;
     this.#claimNext = claimNext;
     this.#executeJob = executeJob;
     this.#writeHeartbeat = writeHeartbeat;
@@ -245,6 +256,7 @@ export class WorkerLifecycle {
   async #poll(): Promise<void> {
     while (this.#acceptingJobs) {
       await this.#recoverStaleJobsIfDue();
+      await this.#runMaintenanceIfDue();
 
       if (this.#activeExecutions.size >= this.#jobConcurrency) {
         await this.#waitForNextPoll();
@@ -279,6 +291,20 @@ export class WorkerLifecycle {
 
     try {
       await this.#recoverStaleJobs();
+    } catch (error) {
+      this.#onPollError(error);
+    }
+  }
+
+  async #runMaintenanceIfDue(): Promise<void> {
+    if (this.#runMaintenance === undefined || Date.now() < this.#nextMaintenanceAt) {
+      return;
+    }
+
+    this.#nextMaintenanceAt = Date.now() + this.#maintenanceIntervalMs;
+
+    try {
+      await this.#runMaintenance(this.activeJobIds);
     } catch (error) {
       this.#onPollError(error);
     }

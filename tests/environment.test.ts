@@ -80,6 +80,8 @@ describe('environment validation', () => {
     expect(environment.RENDER_JOB_POLL_MS).toBe(1000);
     expect(environment.RENDER_STALE_AFTER_MINUTES).toBe(30);
     expect(environment.RENDER_MAX_ATTEMPTS).toBe(2);
+    expect(environment.STORAGE_RETENTION_DAYS).toBe(30);
+    expect(environment.STORAGE_CLEANUP_INTERVAL_MS).toBe(6 * 60 * 60_000);
     expect(environment.WORKER_SHUTDOWN_TIMEOUT_MS).toBe(30_000);
 
     expect(() =>

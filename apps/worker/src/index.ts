@@ -57,6 +57,7 @@ export {
   type WorkerDoctorReport,
 } from './doctor.js';
 export {
+  DEFAULT_MAINTENANCE_INTERVAL_MS,
   DEFAULT_STALE_RECOVERY_INTERVAL_MS,
   DEFAULT_WORKER_SHUTDOWN_TIMEOUT_MS,
   WorkerLifecycle,
@@ -64,3 +65,10 @@ export {
   type WorkerLifecycleOptions,
   type WorkerLifecycleState,
 } from './lifecycle.js';
+export {
+  DEFAULT_CLEANUP_RETENTION_DAYS,
+  StorageRetentionService,
+  runStorageCleanup,
+  type StorageRetentionRunOptions,
+  type StorageRetentionServiceOptions,
+} from './cleanup.js';

@@ -42,3 +42,14 @@ export {
   type ByteRange,
   type StoredAssetStream,
 } from './asset-stream.js';
+export {
+  DEFAULT_BUNDLE_LOCK_RETENTION_MS,
+  DEFAULT_STORAGE_CLEANUP_INTERVAL_MS,
+  DEFAULT_STORAGE_RETENTION_DAYS,
+  cleanupStorage,
+  type StorageCleanupCandidate,
+  type StorageCleanupCategory,
+  type StorageCleanupFailure,
+  type StorageCleanupOptions,
+  type StorageCleanupResult,
+} from './retention.js';
