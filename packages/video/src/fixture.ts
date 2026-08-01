@@ -96,3 +96,72 @@ export const STUDIO_VIDEO_PROPS = {
   project: STUDIO_PROJECT_FIXTURE,
   assets: {},
 } satisfies VideoProps;
+
+export const BREAKING_RED_PROJECT_FIXTURE = ProjectDocumentSchema.parse({
+  ...STUDIO_PROJECT_FIXTURE,
+  metadata: {
+    title: 'Tin nóng: cập nhật đột phá về hạ tầng số Việt Nam',
+    description: 'Fixture breaking-red-v1 với headline tiếng Việt dài và nhiều dấu.',
+  },
+  composition: {
+    ...STUDIO_PROJECT_FIXTURE.composition,
+    backgroundColor: '#120507',
+  },
+  template: {
+    id: 'breaking-red-v1',
+    version: 1,
+  },
+  theme: {
+    ...STUDIO_PROJECT_FIXTURE.theme,
+    primaryColor: '#E11D2E',
+    secondaryColor: '#320910',
+    accentColor: '#FFD166',
+    textColor: '#FFF8F5',
+    mutedTextColor: '#F4A5A9',
+  },
+  scenes: [
+    {
+      id: '11111111-1111-4111-8111-111111111111',
+      type: 'headline',
+      name: 'Headline dài tiếng Việt',
+      enabled: true,
+      durationInFrames: 120,
+      text: {
+        label: 'TIN KHẨN',
+        headline:
+          'Việt Nam công bố bước tiến mới trong chiến lược phát triển hạ tầng số an toàn, bền vững và kết nối toàn dân trong giai đoạn tăng tốc chuyển đổi',
+        body: 'Thông tin mới nhất đang được cập nhật với các mốc triển khai cụ thể.',
+      },
+      style: {
+        textAlign: 'left',
+        emphasis: 'urgent',
+      },
+    },
+    {
+      id: '22222222-2222-4222-8222-222222222222',
+      type: 'bullet-list',
+      name: 'Điểm chính',
+      enabled: true,
+      durationInFrames: 120,
+      text: {
+        label: 'ĐIỂM NÓNG',
+        headline: 'Ba điều cần biết ngay lúc này',
+        bullets: [
+          'Hệ thống mới ưu tiên khả năng mở rộng và bảo mật dữ liệu.',
+          'Các địa phương sẽ nhận hỗ trợ theo từng giai đoạn.',
+          'Người dùng được cập nhật minh bạch về tiến độ triển khai.',
+        ],
+        source: 'Nguồn: HanSYS Video Studio',
+      },
+      style: {
+        textAlign: 'left',
+        emphasis: 'strong',
+      },
+    },
+  ],
+});
+
+export const BREAKING_RED_VIDEO_PROPS = {
+  project: BREAKING_RED_PROJECT_FIXTURE,
+  assets: {},
+} satisfies VideoProps;

@@ -22,18 +22,20 @@ describe('news-clean-v1 manifest', () => {
       'quote',
       'outro',
     ]);
-    expect(listTemplateMetadata()).toEqual([
-      expect.objectContaining({
-        id: 'news-clean-v1',
-        version: 1,
-        supportedAspectRatios: ['9:16', '16:9', '1:1'],
-        defaultProjectPatch: expect.objectContaining({
-          theme: expect.objectContaining({
-            fontFamily: 'BeVietnamPro',
+    expect(listTemplateMetadata()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'news-clean-v1',
+          version: 1,
+          supportedAspectRatios: ['9:16', '16:9', '1:1'],
+          defaultProjectPatch: expect.objectContaining({
+            theme: expect.objectContaining({
+              fontFamily: 'BeVietnamPro',
+            }),
           }),
         }),
-      }),
-    ]);
+      ]),
+    );
   });
 
   it('validates the Vietnamese Studio fixture without errors', () => {

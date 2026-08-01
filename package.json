@@ -16,6 +16,7 @@
     "test": "vitest run",
     "test:e2e": "playwright test",
     "test:video": "node scripts/video-frame-smoke.mjs",
+    "test:video:breaking": "node scripts/breaking-red-frame-smoke.mjs",
     "typecheck": "turbo run typecheck && tsc --project tsconfig.json --noEmit"
   },
   "devDependencies": {

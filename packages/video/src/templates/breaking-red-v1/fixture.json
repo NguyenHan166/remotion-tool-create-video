@@ -1,0 +1,59 @@
+{
+  "project": {
+    "schemaVersion": 1,
+    "metadata": {
+      "title": "Breaking Red Vietnamese fixture",
+      "description": "Long Vietnamese headline smoke fixture."
+    },
+    "composition": {
+      "width": 1080,
+      "height": 1920,
+      "fps": 30,
+      "backgroundColor": "#120507"
+    },
+    "template": {
+      "id": "breaking-red-v1",
+      "version": 1
+    },
+    "theme": {
+      "primaryColor": "#E11D2E",
+      "secondaryColor": "#320910",
+      "accentColor": "#FFD166",
+      "textColor": "#FFF8F5",
+      "mutedTextColor": "#F4A5A9",
+      "fontFamily": "BeVietnamPro",
+      "watermarkText": "HANSYS"
+    },
+    "scenes": [
+      {
+        "id": "33333333-3333-4333-8333-333333333333",
+        "type": "headline",
+        "name": "Long Vietnamese headline",
+        "enabled": true,
+        "durationInFrames": 120,
+        "text": {
+          "label": "TIN KHẨN",
+          "headline": "Việt Nam công bố bước tiến mới trong chiến lược phát triển hạ tầng số an toàn, bền vững và kết nối toàn dân trong giai đoạn tăng tốc chuyển đổi",
+          "body": "Thông tin mới nhất đang được cập nhật với các mốc triển khai cụ thể."
+        },
+        "style": {
+          "textAlign": "left",
+          "emphasis": "urgent"
+        }
+      }
+    ],
+    "captions": {
+      "enabled": false,
+      "source": "none",
+      "style": "clean",
+      "entries": [],
+      "options": {
+        "maxWordsPerPage": 6,
+        "highlightCurrentWord": false,
+        "position": "bottom",
+        "fontSize": 58
+      }
+    }
+  },
+  "assets": {}
+}

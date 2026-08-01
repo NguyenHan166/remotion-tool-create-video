@@ -15,6 +15,12 @@ export {
   templateRegistry,
 } from './registry.js';
 export {
+  BREAKING_RED_V1_ID,
+  BREAKING_RED_V1_SCENE_TYPES,
+  breakingRedV1,
+  validateBreakingRedV1,
+} from './templates/breaking-red-v1.js';
+export {
   NEWS_CLEAN_V1_ID,
   NEWS_CLEAN_V1_SCENE_TYPES,
   newsCleanV1,
