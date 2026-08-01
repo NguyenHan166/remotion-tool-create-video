@@ -10,7 +10,8 @@
     "./fixture": "./src/fixture.ts",
     "./root": "./src/root.tsx",
     "./templates/news-clean-v1": "./src/templates/news-clean-v1/index.ts",
-    "./templates/breaking-red-v1": "./src/templates/breaking-red-v1/index.ts"
+    "./templates/breaking-red-v1": "./src/templates/breaking-red-v1/index.ts",
+    "./templates/warning-dark-v1": "./src/templates/warning-dark-v1/index.ts"
   },
   "scripts": {
     "lint": "eslint src remotion.config.ts --max-warnings=0",

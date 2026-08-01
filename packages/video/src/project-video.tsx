@@ -2,6 +2,7 @@ import { ProjectDocumentSchema } from '@hansys/project-schema';
 import { getTemplate } from '@hansys/template-registry';
 import './templates/breaking-red-v1/index.js';
 import './templates/news-clean-v1/index.js';
+import './templates/warning-dark-v1/index.js';
 import { type ResolvedAsset, type VideoProps } from './types.js';
 
 export function ProjectVideo({ project: projectInput, assets }: VideoProps) {

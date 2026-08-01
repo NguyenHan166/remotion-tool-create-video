@@ -5,6 +5,7 @@ import {
 } from './errors.js';
 import { breakingRedV1 } from './templates/breaking-red-v1.js';
 import { newsCleanV1 } from './templates/news-clean-v1.js';
+import { warningDarkV1 } from './templates/warning-dark-v1.js';
 import { type TemplateManifest, type TemplateMetadata, type TemplateRegistry } from './types.js';
 
 export function defineTemplateRegistry<const TRegistry extends TemplateRegistry>(
@@ -22,6 +23,7 @@ export function defineTemplateRegistry<const TRegistry extends TemplateRegistry>
 export const templateRegistry = defineTemplateRegistry({
   [breakingRedV1.id]: breakingRedV1,
   [newsCleanV1.id]: newsCleanV1,
+  [warningDarkV1.id]: warningDarkV1,
 });
 
 export function getTemplate(

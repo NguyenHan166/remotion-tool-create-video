@@ -1,0 +1,72 @@
+{
+  "project": {
+    "schemaVersion": 1,
+    "metadata": {
+      "title": "Warning Dark safety fixture",
+      "description": "Caption safe-area smoke fixture for a Vietnamese scam warning."
+    },
+    "composition": {
+      "width": 1080,
+      "height": 1920,
+      "fps": 30,
+      "backgroundColor": "#090A0F"
+    },
+    "template": {
+      "id": "warning-dark-v1",
+      "version": 1
+    },
+    "theme": {
+      "primaryColor": "#F04438",
+      "secondaryColor": "#171A24",
+      "accentColor": "#F7C948",
+      "textColor": "#F8FAFC",
+      "mutedTextColor": "#AAB2C0",
+      "fontFamily": "BeVietnamPro",
+      "watermarkText": "HANSYS SAFETY"
+    },
+    "scenes": [
+      {
+        "id": "66666666-6666-4666-8666-666666666666",
+        "type": "bullet-list",
+        "name": "Scam warning",
+        "enabled": true,
+        "durationInFrames": 180,
+        "text": {
+          "label": "LỪA ĐẢO TRỰC TUYẾN",
+          "headline": "Dừng lại trước khi chuyển tiền cho người lạ",
+          "bullets": [
+            "Không cung cấp mã OTP hoặc mật khẩu qua điện thoại.",
+            "Kiểm tra website và hotline bằng kênh chính thức.",
+            "Báo cáo ngay khi phát hiện dấu hiệu bất thường."
+          ],
+          "source": "Nguồn: HanSYS Safety Desk"
+        },
+        "style": {
+          "textAlign": "left",
+          "emphasis": "urgent",
+          "variant": "scam"
+        }
+      }
+    ],
+    "captions": {
+      "enabled": true,
+      "source": "manual",
+      "style": "clean",
+      "entries": [
+        {
+          "id": "77777777-7777-4777-8777-777777777777",
+          "startMs": 0,
+          "endMs": 6000,
+          "text": "Hãy dừng lại và kiểm tra trước khi chuyển tiền."
+        }
+      ],
+      "options": {
+        "maxWordsPerPage": 6,
+        "highlightCurrentWord": false,
+        "position": "bottom",
+        "fontSize": 58
+      }
+    }
+  },
+  "assets": {}
+}

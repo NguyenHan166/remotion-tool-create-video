@@ -165,3 +165,71 @@ export const BREAKING_RED_VIDEO_PROPS = {
   project: BREAKING_RED_PROJECT_FIXTURE,
   assets: {},
 } satisfies VideoProps;
+
+export const WARNING_DARK_PROJECT_FIXTURE = ProjectDocumentSchema.parse({
+  ...STUDIO_PROJECT_FIXTURE,
+  metadata: {
+    title: 'Cảnh báo an toàn số cho cộng đồng',
+    description: 'Fixture warning-dark-v1 kiểm tra bullet emphasis và caption safe area.',
+  },
+  composition: {
+    ...STUDIO_PROJECT_FIXTURE.composition,
+    backgroundColor: '#090A0F',
+  },
+  template: {
+    id: 'warning-dark-v1',
+    version: 1,
+  },
+  theme: {
+    ...STUDIO_PROJECT_FIXTURE.theme,
+    primaryColor: '#F04438',
+    secondaryColor: '#171A24',
+    accentColor: '#F7C948',
+    textColor: '#F8FAFC',
+    mutedTextColor: '#AAB2C0',
+  },
+  scenes: [
+    {
+      id: '44444444-4444-4444-8444-444444444444',
+      type: 'headline',
+      name: 'Cảnh báo chính',
+      enabled: true,
+      durationInFrames: 120,
+      text: {
+        label: 'CẢNH BÁO',
+        headline: 'Không chia sẻ mã OTP hoặc mật khẩu cho bất kỳ ai',
+        body: 'Kẻ xấu có thể giả danh ngân hàng, sàn thương mại điện tử hoặc cơ quan nhà nước.',
+      },
+      style: {
+        textAlign: 'left',
+        emphasis: 'urgent',
+      },
+    },
+    {
+      id: '55555555-5555-4555-8555-555555555555',
+      type: 'bullet-list',
+      name: 'Ba bước an toàn',
+      enabled: true,
+      durationInFrames: 120,
+      text: {
+        label: 'ĐIỂM CẦN NHỚ',
+        headline: 'Dừng lại và kiểm tra trước khi hành động',
+        bullets: [
+          'Không đọc hoặc gửi mã xác thực một lần qua điện thoại.',
+          'Kiểm tra địa chỉ website và số hotline trên kênh chính thức.',
+          'Báo cáo ngay khi phát hiện dấu hiệu lừa đảo.',
+        ],
+        source: 'Nguồn: HanSYS Safety Desk',
+      },
+      style: {
+        textAlign: 'left',
+        emphasis: 'strong',
+      },
+    },
+  ],
+});
+
+export const WARNING_DARK_VIDEO_PROPS = {
+  project: WARNING_DARK_PROJECT_FIXTURE,
+  assets: {},
+} satisfies VideoProps;

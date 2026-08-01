@@ -26,6 +26,12 @@ export {
   newsCleanV1,
   validateNewsCleanV1,
 } from './templates/news-clean-v1.js';
+export {
+  WARNING_DARK_V1_ID,
+  WARNING_DARK_V1_SCENE_TYPES,
+  validateWarningDarkV1,
+  warningDarkV1,
+} from './templates/warning-dark-v1.js';
 export type {
   TemplateAspectRatio,
   TemplateAsset,
