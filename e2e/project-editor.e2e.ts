@@ -176,6 +176,12 @@ test.describe('project editor preview', () => {
         }),
       });
     });
+    await page.route('**/api/v1/renders**', async (route) => {
+      await route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({ items: [], page: 1, pageSize: 10, total: 0 }),
+      });
+    });
   });
 
   test('updates the Remotion Player from local draft text without a render request', async ({
@@ -183,7 +189,7 @@ test.describe('project editor preview', () => {
   }) => {
     const renderRequests: string[] = [];
     page.on('request', (request) => {
-      if (request.url().includes('/renders')) {
+      if (request.url().includes('/renders') && request.method() === 'POST') {
         renderRequests.push(request.url());
       }
     });

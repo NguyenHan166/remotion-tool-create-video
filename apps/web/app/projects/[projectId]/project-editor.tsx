@@ -33,6 +33,7 @@ import {
 } from '../../../src/projects/player-timeline';
 import { useProjectAutosave } from '../../../src/projects/use-project-autosave';
 import { AutosaveStatus } from './autosave-status';
+import { RenderQueue } from './render-queue';
 import { SceneInspector } from './scene-inspector';
 import { SceneList } from './scene-list';
 import { SceneStripControls } from './scene-strip-controls';
@@ -361,6 +362,13 @@ function LoadedProjectEditor({
           />
 
           <AutosaveStatus autosave={autosave} />
+
+          <RenderQueue
+            projectId={project.id}
+            initialPreset={draft.export.preset}
+            autosavePhase={autosave.phase}
+            projectArchived={project.status === 'ARCHIVED'}
+          />
         </aside>
       </div>
     </main>

@@ -86,4 +86,22 @@ export {
   type RenderOutputResponse,
   type RenderService,
 } from './renders/service.js';
+export {
+  RenderApiError,
+  cancelRender,
+  createRender,
+  fetchRenders,
+  getRenderDownloadUrl,
+  getRenderPollingInterval,
+  getRenderProgressPercent,
+  getRenderThumbnailUrl,
+  isActiveRenderStatus,
+  retryRender,
+  type RenderJobDto,
+  type RenderJobPageDto,
+  type RenderOutputDto,
+  type RenderOutputKind,
+  type RenderPreset,
+  type RenderStatus,
+} from './renders/client.js';
 export { storagePaths } from './storage.js';
