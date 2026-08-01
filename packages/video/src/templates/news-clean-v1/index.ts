@@ -8,6 +8,15 @@ import { NewsCleanV1Template } from './Template.js';
 registerTemplateRenderer(NEWS_CLEAN_V1_ID, NewsCleanV1Template);
 
 export { InvalidTemplateProjectError, MissingTemplateAssetError } from './errors.js';
+export {
+  CaptionLayer,
+  getActiveCaptionEntry,
+  getActiveCaptionPage,
+  getCaptionPages,
+  getHighlightedCaptionWordIndex,
+  type CaptionPage,
+  type CaptionWord,
+} from './CaptionLayer.js';
 export { NewsCleanV1Template } from './Template.js';
 export {
   NEWS_CLEAN_V1_ID,

@@ -59,6 +59,37 @@ export const STUDIO_PROJECT_FIXTURE = ProjectDocumentSchema.parse({
       },
     },
   ],
+  captions: {
+    enabled: true,
+    source: 'manual',
+    style: 'clean',
+    entries: [
+      {
+        id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+        startMs: 0,
+        endMs: 2_400,
+        text: 'Xin chào, đây là bản tin công nghệ hôm nay.',
+      },
+      {
+        id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+        startMs: 2_700,
+        endMs: 5_600,
+        text: 'Các điểm đáng chú ý sẽ được cập nhật liên tục.',
+      },
+      {
+        id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+        startMs: 5_900,
+        endMs: 7_000,
+        text: 'Cảm ơn bạn đã theo dõi.',
+      },
+    ],
+    options: {
+      maxWordsPerPage: 6,
+      highlightCurrentWord: false,
+      position: 'bottom',
+      fontSize: 58,
+    },
+  },
 });
 
 export const STUDIO_VIDEO_PROPS = {
