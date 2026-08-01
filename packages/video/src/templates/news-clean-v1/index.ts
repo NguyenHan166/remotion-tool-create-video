@@ -29,6 +29,7 @@ export {
   type BackgroundMusicLayerConfig,
 } from './BackgroundMusicLayer.js';
 export { NewsCleanV1Template } from './Template.js';
+export { resolveSceneSource } from './components.js';
 export {
   getVoiceoverLayerConfig,
   VoiceoverLayer,

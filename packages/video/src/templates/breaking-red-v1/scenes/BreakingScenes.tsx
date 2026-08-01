@@ -6,6 +6,7 @@ import {
   BreakingSafeArea,
   BreakingSourceBadge,
   BreakingText,
+  resolveSceneSource,
   resolveSceneAsset,
   WarningIcon,
 } from '../components.js';
@@ -81,7 +82,11 @@ export function BreakingHookScene({ project, scene }: BreakingSceneProps) {
             maxLines={6}
             text={scene.text.body}
           />
-          <BreakingSourceBadge source={scene.text.source} />
+          <BreakingSourceBadge
+            accentColor={project.theme.accentColor}
+            mutedColor={project.theme.mutedTextColor}
+            source={resolveSceneSource(project, scene)}
+          />
         </div>
       </BreakingSafeArea>
     </AbsoluteFill>
@@ -125,7 +130,11 @@ export function BreakingHeadlineScene({ project, scene }: BreakingSceneProps) {
             maxLines={6}
             text={scene.text.body}
           />
-          <BreakingSourceBadge source={scene.text.source} />
+          <BreakingSourceBadge
+            accentColor={project.theme.accentColor}
+            mutedColor={project.theme.mutedTextColor}
+            source={resolveSceneSource(project, scene)}
+          />
         </div>
       </BreakingSafeArea>
     </AbsoluteFill>
@@ -162,7 +171,11 @@ export function BreakingContentScene({ project, scene }: BreakingSceneProps) {
             maxLines={9}
             text={scene.text.body}
           />
-          <BreakingSourceBadge source={scene.text.source} />
+          <BreakingSourceBadge
+            accentColor={project.theme.accentColor}
+            mutedColor={project.theme.mutedTextColor}
+            source={resolveSceneSource(project, scene)}
+          />
         </div>
       </BreakingSafeArea>
     </AbsoluteFill>
@@ -237,7 +250,11 @@ export function BreakingBulletListScene({ project, scene }: BreakingSceneProps) 
               );
             })}
           </div>
-          <BreakingSourceBadge source={scene.text.source} />
+          <BreakingSourceBadge
+            accentColor={project.theme.accentColor}
+            mutedColor={project.theme.mutedTextColor}
+            source={resolveSceneSource(project, scene)}
+          />
         </div>
       </BreakingSafeArea>
     </AbsoluteFill>
@@ -298,7 +315,11 @@ export function BreakingMediaScene({ project, scene, assets }: BreakingSceneProp
             maxLines={landscape ? 5 : 4}
             text={scene.text.body}
           />
-          <BreakingSourceBadge source={scene.text.source} />
+          <BreakingSourceBadge
+            accentColor={project.theme.accentColor}
+            mutedColor={project.theme.mutedTextColor}
+            source={resolveSceneSource(project, scene)}
+          />
         </div>
       </BreakingSafeArea>
     </AbsoluteFill>
@@ -347,7 +368,11 @@ export function BreakingQuoteScene({ project, scene }: BreakingSceneProps) {
             maxLines={3}
             text={scene.text.quoteAuthor}
           />
-          <BreakingSourceBadge source={scene.text.source} />
+          <BreakingSourceBadge
+            accentColor={project.theme.accentColor}
+            mutedColor={project.theme.mutedTextColor}
+            source={resolveSceneSource(project, scene)}
+          />
         </div>
       </BreakingSafeArea>
     </AbsoluteFill>

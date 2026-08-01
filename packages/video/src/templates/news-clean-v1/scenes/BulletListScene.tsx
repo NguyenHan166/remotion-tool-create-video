@@ -1,5 +1,5 @@
 import { AbsoluteFill, interpolate, useCurrentFrame, useVideoConfig } from 'remotion';
-import { ResponsiveText, SafeArea, SourceBadge } from '../components.js';
+import { ResponsiveText, resolveSceneSource, SafeArea, SourceBadge } from '../components.js';
 import { type NewsCleanSceneProps } from '../SceneRenderer.js';
 import { NEWS_CLEAN_COLORS, NEWS_CLEAN_FONT_FAMILY } from '../tokens.js';
 
@@ -70,7 +70,11 @@ export function BulletListScene({ project, scene }: NewsCleanSceneProps) {
               );
             })}
           </div>
-          <SourceBadge source={scene.text.source} />
+          <SourceBadge
+            accentColor={project.theme.accentColor}
+            mutedColor={project.theme.mutedTextColor}
+            source={resolveSceneSource(project, scene)}
+          />
         </div>
       </SafeArea>
     </AbsoluteFill>

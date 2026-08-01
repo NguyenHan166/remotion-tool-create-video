@@ -2,6 +2,7 @@ import { AbsoluteFill, useVideoConfig } from 'remotion';
 import {
   MediaFrame,
   ResponsiveText,
+  resolveSceneSource,
   SafeArea,
   SourceBadge,
   resolveSceneAsset,
@@ -63,7 +64,11 @@ export function MediaStoryScene(props: NewsCleanSceneProps) {
             maxLines={landscape ? 5 : 4}
             text={scene.text.body}
           />
-          <SourceBadge source={scene.text.source} />
+          <SourceBadge
+            accentColor={project.theme.accentColor}
+            mutedColor={project.theme.mutedTextColor}
+            source={resolveSceneSource(project, scene)}
+          />
         </div>
       </SafeArea>
     </AbsoluteFill>

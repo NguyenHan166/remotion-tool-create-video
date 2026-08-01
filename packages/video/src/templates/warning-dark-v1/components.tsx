@@ -118,7 +118,15 @@ export function WarningText({
   );
 }
 
-export function WarningSourceBadge({ source }: { source: string | undefined }) {
+export function WarningSourceBadge({
+  source,
+  accentColor = WARNING_DARK_COLORS.yellow,
+  mutedColor = WARNING_DARK_COLORS.muted,
+}: {
+  source: string | undefined;
+  accentColor?: string;
+  mutedColor?: string;
+}) {
   if (source === undefined || source.trim().length === 0) {
     return null;
   }
@@ -127,7 +135,7 @@ export function WarningSourceBadge({ source }: { source: string | undefined }) {
     <div
       style={{
         alignItems: 'center',
-        color: WARNING_DARK_COLORS.muted,
+        color: mutedColor,
         display: 'flex',
         fontFamily: WARNING_DARK_FONT_FAMILY,
         fontSize: 21,
@@ -138,7 +146,7 @@ export function WarningSourceBadge({ source }: { source: string | undefined }) {
     >
       <span
         style={{
-          backgroundColor: WARNING_DARK_COLORS.yellow,
+          backgroundColor: accentColor,
           borderRadius: 999,
           display: 'block',
           flex: '0 0 auto',
@@ -158,6 +166,10 @@ export function WarningSourceBadge({ source }: { source: string | undefined }) {
       </span>
     </div>
   );
+}
+
+export function resolveSceneSource(project: ProjectDocumentV1, scene: SceneV1): string | undefined {
+  return scene.text.source ?? project.theme.sourceText;
 }
 
 export function WarningIcon({ size = 80 }: { size?: number }) {
@@ -266,10 +278,10 @@ function WarningLogo({
     <div
       style={{
         alignItems: 'center',
-        backgroundColor: WARNING_DARK_COLORS.panelRaised,
+        backgroundColor: project.theme.secondaryColor,
         border: `1px solid ${WARNING_DARK_COLORS.rule}`,
         borderRadius: 8,
-        color: WARNING_DARK_COLORS.white,
+        color: project.theme.textColor,
         display: 'flex',
         fontFamily: WARNING_DARK_FONT_FAMILY,
         fontSize: 19,
@@ -345,7 +357,7 @@ export function WarningSharedLayers({
       {project.theme.watermarkText === undefined ? null : (
         <div
           style={{
-            color: WARNING_DARK_COLORS.muted,
+            color: project.theme.mutedTextColor,
             fontFamily: WARNING_DARK_FONT_FAMILY,
             fontSize: 17,
             fontWeight: 700,

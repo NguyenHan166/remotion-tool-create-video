@@ -394,6 +394,28 @@ test.describe('project editor preview', () => {
     await expect(page.getByTestId('autosave-status')).toHaveAttribute('data-phase', 'saved');
   });
 
+  test('edits shared theme branding and source controls in the live draft', async ({ page }) => {
+    const autosaveRequests = await mockAutosavingProject(
+      page,
+      createProjectPayload('Theme Inspector Project'),
+    );
+
+    await page.goto(`/projects/${projectId}`);
+    await page.getByLabel('Logo thương hiệu').selectOption('88888888-8888-4888-8888-888888888888');
+    await page.getByLabel('Watermark').fill('HANSYS ALERT');
+    await page.getByLabel('Nguồn mặc định').fill('HanSYS Safety Desk');
+    await page.getByLabel('Font chữ').selectOption('Inter');
+
+    await expect(page.getByTestId('theme-inspector')).toContainText('màu sắc');
+    await expect(page.getByTestId('autosave-status')).toHaveAttribute('data-phase', 'saved');
+    expect(autosaveRequests.at(-1)?.document.theme).toMatchObject({
+      fontFamily: 'Inter',
+      logoAssetId: '88888888-8888-4888-8888-888888888888',
+      sourceText: 'HanSYS Safety Desk',
+      watermarkText: 'HANSYS ALERT',
+    });
+  });
+
   test('keeps local edits visible and retries them after a stale-tab conflict', async ({
     page,
   }) => {

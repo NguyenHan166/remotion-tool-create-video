@@ -118,7 +118,15 @@ export function BreakingText({
   );
 }
 
-export function BreakingSourceBadge({ source }: { source: string | undefined }) {
+export function BreakingSourceBadge({
+  source,
+  accentColor = BREAKING_RED_COLORS.accent,
+  mutedColor = BREAKING_RED_COLORS.muted,
+}: {
+  source: string | undefined;
+  accentColor?: string;
+  mutedColor?: string;
+}) {
   if (source === undefined || source.trim().length === 0) {
     return null;
   }
@@ -127,7 +135,7 @@ export function BreakingSourceBadge({ source }: { source: string | undefined }) 
     <div
       style={{
         alignItems: 'center',
-        color: BREAKING_RED_COLORS.muted,
+        color: mutedColor,
         display: 'flex',
         fontFamily: BREAKING_RED_FONT_FAMILY,
         fontSize: 22,
@@ -138,7 +146,7 @@ export function BreakingSourceBadge({ source }: { source: string | undefined }) 
     >
       <span
         style={{
-          backgroundColor: BREAKING_RED_COLORS.accent,
+          backgroundColor: accentColor,
           borderRadius: 999,
           display: 'block',
           flex: '0 0 auto',
@@ -158,6 +166,10 @@ export function BreakingSourceBadge({ source }: { source: string | undefined }) 
       </span>
     </div>
   );
+}
+
+export function resolveSceneSource(project: ProjectDocumentV1, scene: SceneV1): string | undefined {
+  return scene.text.source ?? project.theme.sourceText;
 }
 
 export function WarningIcon({ size = 70 }: { size?: number }) {
@@ -266,9 +278,9 @@ function BreakingLogo({
     <div
       style={{
         alignItems: 'center',
-        backgroundColor: BREAKING_RED_COLORS.white,
+        backgroundColor: project.theme.primaryColor,
         borderRadius: 8,
-        color: BREAKING_RED_COLORS.ink,
+        color: project.theme.textColor,
         display: 'flex',
         fontFamily: BREAKING_RED_FONT_FAMILY,
         fontSize: 20,
@@ -343,7 +355,7 @@ export function BreakingSharedLayers({
       {project.theme.watermarkText === undefined ? null : (
         <div
           style={{
-            color: BREAKING_RED_COLORS.muted,
+            color: project.theme.mutedTextColor,
             fontFamily: BREAKING_RED_FONT_FAMILY,
             fontSize: 18,
             fontWeight: 700,

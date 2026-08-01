@@ -58,6 +58,7 @@ export function validateNewsCleanV1(project: ProjectDocumentV1) {
 
   project.scenes.forEach((scene, sceneIndex) => {
     const path = `scenes.${sceneIndex}`;
+    const source = scene.text.source ?? project.theme.sourceText;
 
     if (!NEWS_CLEAN_V1_SCENE_TYPES.includes(scene.type)) {
       errors.push(
@@ -101,7 +102,7 @@ export function validateNewsCleanV1(project: ProjectDocumentV1) {
 
     if (
       ['content', 'image', 'video', 'bullet-list', 'quote'].includes(scene.type) &&
-      (scene.text.source?.trim().length ?? 0) === 0
+      (source?.trim().length ?? 0) === 0
     ) {
       warnings.push(
         issue(
@@ -124,6 +125,7 @@ export const newsCleanV1: TemplateManifest = {
   thumbnailAsset: '/templates/news-clean-v1/thumbnail.webp',
   supportedAspectRatios: SUPPORTED_ASPECT_RATIOS,
   supportedSceneTypes: NEWS_CLEAN_V1_SCENE_TYPES,
+  themeControls: ['colors', 'font', 'logo', 'watermark', 'source'],
   variants: [
     {
       id: 'default',

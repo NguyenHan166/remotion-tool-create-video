@@ -10,7 +10,7 @@ registerTemplateRenderer(BREAKING_RED_V1_ID, BreakingRedV1Template);
 export { InvalidTemplateProjectError, MissingTemplateAssetError } from './errors.js';
 export { BreakingRedV1Template } from './Template.js';
 export { BreakingSceneRenderer, type BreakingSceneProps } from './SceneRenderer.js';
-export { getBreakingHeadlineFontSize } from './components.js';
+export { getBreakingHeadlineFontSize, resolveSceneSource } from './components.js';
 export {
   BREAKING_RED_V1_ID,
   BREAKING_RED_V1_SCENE_TYPES,

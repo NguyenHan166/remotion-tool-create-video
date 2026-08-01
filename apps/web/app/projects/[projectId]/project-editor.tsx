@@ -40,6 +40,7 @@ import { RenderQueue } from './render-queue';
 import { SceneInspector } from './scene-inspector';
 import { SceneList } from './scene-list';
 import { SceneStripControls } from './scene-strip-controls';
+import { ThemeInspector } from './theme-inspector';
 import { TtsSettings } from './tts-settings';
 import { VoiceoverEditor } from './voiceover-editor';
 
@@ -401,6 +402,12 @@ function LoadedProjectEditor({
         </section>
 
         <aside className="min-w-0">
+          <ThemeInspector
+            state={editorState}
+            onChange={(state) => {
+              updateEditor(() => state);
+            }}
+          />
           <SceneInspector
             key={editorState.selectedSceneId}
             state={editorState}

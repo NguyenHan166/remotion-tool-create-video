@@ -275,6 +275,7 @@ export const ProjectDocumentV1Schema = z
         fontFamily: z.enum(['BeVietnamPro', 'Inter', 'NotoSans']).default(DEFAULT_THEME.fontFamily),
         logoAssetId: assetIdSchema.optional(),
         watermarkText: z.string().max(200).optional(),
+        sourceText: z.string().max(500).optional(),
       })
       .default(() => ({ ...DEFAULT_THEME })),
     scenes: z.array(SceneV1Schema).min(1).max(100),

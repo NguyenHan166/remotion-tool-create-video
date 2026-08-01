@@ -14,6 +14,7 @@ export {
   listTemplateMetadata,
   templateRegistry,
 } from './registry.js';
+export { TEMPLATE_THEME_CONTROLS, validateTemplateSupport } from './support.js';
 export {
   BREAKING_RED_V1_ID,
   BREAKING_RED_V1_SCENE_TYPES,
@@ -41,5 +42,6 @@ export type {
   TemplateRegistry,
   TemplateValidationIssue,
   TemplateValidationResult,
+  TemplateThemeControl,
   TemplateVariant,
 } from './types.js';

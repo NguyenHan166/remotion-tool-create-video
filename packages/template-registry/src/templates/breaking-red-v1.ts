@@ -58,6 +58,7 @@ export function validateBreakingRedV1(project: ProjectDocumentV1) {
 
   project.scenes.forEach((scene, sceneIndex) => {
     const path = `scenes.${sceneIndex}`;
+    const source = scene.text.source ?? project.theme.sourceText;
 
     if (!BREAKING_RED_V1_SCENE_TYPES.includes(scene.type)) {
       errors.push(
@@ -101,7 +102,7 @@ export function validateBreakingRedV1(project: ProjectDocumentV1) {
 
     if (
       ['content', 'image', 'video', 'bullet-list', 'quote'].includes(scene.type) &&
-      (scene.text.source?.trim().length ?? 0) === 0
+      (source?.trim().length ?? 0) === 0
     ) {
       warnings.push(
         issue(
@@ -124,6 +125,7 @@ export const breakingRedV1: TemplateManifest = {
   thumbnailAsset: '/templates/breaking-red-v1/thumbnail.webp',
   supportedAspectRatios: SUPPORTED_ASPECT_RATIOS,
   supportedSceneTypes: BREAKING_RED_V1_SCENE_TYPES,
+  themeControls: ['colors', 'font', 'logo', 'watermark', 'source'],
   variants: [
     {
       id: 'default',

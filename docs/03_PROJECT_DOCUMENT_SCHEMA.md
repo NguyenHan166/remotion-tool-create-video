@@ -42,6 +42,7 @@ export type ProjectDocumentV1 = {
     fontFamily: "BeVietnamPro" | "Inter" | "NotoSans";
     logoAssetId?: string;
     watermarkText?: string;
+    sourceText?: string;
   };
   scenes: SceneV1[];
   audio: {

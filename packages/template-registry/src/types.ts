@@ -22,6 +22,8 @@ export type TemplateVariant = {
   name: string;
 };
 
+export type TemplateThemeControl = 'colors' | 'font' | 'logo' | 'watermark' | 'source';
+
 export type TemplateValidationIssue = {
   code: string;
   path: string;
@@ -42,6 +44,7 @@ export type TemplateManifest = {
   supportedAspectRatios: readonly TemplateAspectRatio[];
   supportedSceneTypes: readonly SceneV1['type'][];
   variants: readonly TemplateVariant[];
+  themeControls?: readonly TemplateThemeControl[];
   defaultProjectPatch: Partial<ProjectDocumentV1>;
   validate: (project: ProjectDocumentV1) => TemplateValidationResult;
   Component: ComponentType<TemplateComponentProps>;

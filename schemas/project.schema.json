@@ -139,6 +139,10 @@
         "watermarkText": {
           "type": "string",
           "maxLength": 200
+        },
+        "sourceText": {
+          "type": "string",
+          "maxLength": 500
         }
       },
       "required": [

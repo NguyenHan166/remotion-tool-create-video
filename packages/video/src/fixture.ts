@@ -233,3 +233,33 @@ export const WARNING_DARK_VIDEO_PROPS = {
   project: WARNING_DARK_PROJECT_FIXTURE,
   assets: {},
 } satisfies VideoProps;
+
+export const THEME_FIXTURE_LOGO_ASSET_ID = '99999999-9999-4999-8999-999999999999';
+
+export const THEME_FIXTURE_LOGO_ASSET = {
+  id: THEME_FIXTURE_LOGO_ASSET_ID,
+  kind: 'LOGO',
+  src: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='96' height='96'%3E%3Crect width='96' height='96' rx='20' fill='%23F7C948'/%3E%3Cpath d='M48 18 79 74H17Z' fill='%23090A0F'/%3E%3C/svg%3E",
+} as const;
+
+function createThemeFixture(project: typeof STUDIO_PROJECT_FIXTURE) {
+  return ProjectDocumentSchema.parse({
+    ...structuredClone(project),
+    theme: {
+      ...project.theme,
+      logoAssetId: THEME_FIXTURE_LOGO_ASSET_ID,
+      watermarkText: 'THEME FIXTURE',
+      sourceText: 'HanSYS Theme Desk',
+    },
+  });
+}
+
+export const THEME_TEMPLATE_FIXTURES = {
+  'news-clean-v1': createThemeFixture(STUDIO_PROJECT_FIXTURE),
+  'breaking-red-v1': createThemeFixture(BREAKING_RED_PROJECT_FIXTURE),
+  'warning-dark-v1': createThemeFixture(WARNING_DARK_PROJECT_FIXTURE),
+} as const;
+
+export const THEME_FIXTURE_ASSETS = {
+  [THEME_FIXTURE_LOGO_ASSET_ID]: THEME_FIXTURE_LOGO_ASSET,
+} satisfies VideoProps['assets'];

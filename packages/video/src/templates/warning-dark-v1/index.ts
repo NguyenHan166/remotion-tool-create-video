@@ -15,6 +15,7 @@ export {
   WarningText,
   WarningIcon,
   getWarningHeadlineFontSize,
+  resolveSceneSource,
   resolveSceneAsset,
 } from './components.js';
 export { WarningDarkV1Template } from './Template.js';

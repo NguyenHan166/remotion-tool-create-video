@@ -103,7 +103,15 @@ export function ResponsiveText({
   );
 }
 
-export function SourceBadge({ source }: { source: string | undefined }) {
+export function SourceBadge({
+  source,
+  accentColor = NEWS_CLEAN_COLORS.accent,
+  mutedColor = NEWS_CLEAN_COLORS.muted,
+}: {
+  source: string | undefined;
+  accentColor?: string;
+  mutedColor?: string;
+}) {
   if (source === undefined || source.trim().length === 0) {
     return null;
   }
@@ -112,7 +120,7 @@ export function SourceBadge({ source }: { source: string | undefined }) {
     <div
       style={{
         alignItems: 'center',
-        color: NEWS_CLEAN_COLORS.muted,
+        color: mutedColor,
         display: 'flex',
         fontFamily: NEWS_CLEAN_FONT_FAMILY,
         fontSize: 22,
@@ -123,7 +131,7 @@ export function SourceBadge({ source }: { source: string | undefined }) {
     >
       <span
         style={{
-          backgroundColor: NEWS_CLEAN_COLORS.accent,
+          backgroundColor: accentColor,
           borderRadius: 999,
           display: 'block',
           flex: '0 0 auto',
@@ -143,6 +151,10 @@ export function SourceBadge({ source }: { source: string | undefined }) {
       </span>
     </div>
   );
+}
+
+export function resolveSceneSource(project: ProjectDocumentV1, scene: SceneV1): string | undefined {
+  return scene.text.source ?? project.theme.sourceText;
 }
 
 type MediaFrameProps = {
@@ -224,9 +236,9 @@ export function LogoMark({
     <div
       style={{
         alignItems: 'center',
-        backgroundColor: NEWS_CLEAN_COLORS.navy,
+        backgroundColor: project.theme.primaryColor,
         borderRadius: 999,
-        color: NEWS_CLEAN_COLORS.white,
+        color: project.theme.textColor,
         display: 'flex',
         fontFamily: NEWS_CLEAN_FONT_FAMILY,
         fontSize: 22,
@@ -275,7 +287,7 @@ export function SharedLayers({
       {project.theme.watermarkText === undefined ? null : (
         <div
           style={{
-            color: NEWS_CLEAN_COLORS.muted,
+            color: project.theme.mutedTextColor,
             fontFamily: NEWS_CLEAN_FONT_FAMILY,
             fontSize: 20,
             fontWeight: 700,

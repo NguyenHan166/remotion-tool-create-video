@@ -54,6 +54,7 @@ function toTemplateMetadata(manifest: TemplateManifest): TemplateMetadata {
     supportedAspectRatios: [...manifest.supportedAspectRatios],
     supportedSceneTypes: [...manifest.supportedSceneTypes],
     variants: manifest.variants.map((variant) => ({ ...variant })),
+    ...(manifest.themeControls === undefined ? {} : { themeControls: [...manifest.themeControls] }),
     defaultProjectPatch: manifest.defaultProjectPatch,
   };
 }

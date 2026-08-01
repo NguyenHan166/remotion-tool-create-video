@@ -8,6 +8,7 @@ import {
   WarningSafeArea,
   WarningSourceBadge,
   WarningText,
+  resolveSceneSource,
 } from '../components.js';
 import { WARNING_DARK_COLORS, WARNING_DARK_FONT_FAMILY } from '../tokens.js';
 
@@ -102,7 +103,11 @@ export function WarningHookScene({ project, scene }: WarningSceneProps) {
             maxLines={6}
             text={scene.text.body}
           />
-          <WarningSourceBadge source={scene.text.source} />
+          <WarningSourceBadge
+            accentColor={project.theme.accentColor}
+            mutedColor={project.theme.mutedTextColor}
+            source={resolveSceneSource(project, scene)}
+          />
         </div>
       </WarningSafeArea>
     </AbsoluteFill>
@@ -144,7 +149,11 @@ export function WarningHeadlineScene({ project, scene }: WarningSceneProps) {
             maxLines={6}
             text={scene.text.body}
           />
-          <WarningSourceBadge source={scene.text.source} />
+          <WarningSourceBadge
+            accentColor={project.theme.accentColor}
+            mutedColor={project.theme.mutedTextColor}
+            source={resolveSceneSource(project, scene)}
+          />
         </div>
       </WarningSafeArea>
     </AbsoluteFill>
@@ -182,7 +191,11 @@ export function WarningContentScene({ project, scene }: WarningSceneProps) {
               text={scene.text.body}
             />
           </div>
-          <WarningSourceBadge source={scene.text.source} />
+          <WarningSourceBadge
+            accentColor={project.theme.accentColor}
+            mutedColor={project.theme.mutedTextColor}
+            source={resolveSceneSource(project, scene)}
+          />
         </div>
       </WarningSafeArea>
     </AbsoluteFill>
@@ -268,7 +281,11 @@ export function WarningBulletListScene({ project, scene }: WarningSceneProps) {
               );
             })}
           </div>
-          <WarningSourceBadge source={scene.text.source} />
+          <WarningSourceBadge
+            accentColor={project.theme.accentColor}
+            mutedColor={project.theme.mutedTextColor}
+            source={resolveSceneSource(project, scene)}
+          />
         </div>
       </WarningSafeArea>
     </AbsoluteFill>
@@ -329,7 +346,11 @@ export function WarningMediaScene({ project, scene, assets }: WarningSceneProps)
             maxLines={landscape ? 5 : 4}
             text={scene.text.body}
           />
-          <WarningSourceBadge source={scene.text.source} />
+          <WarningSourceBadge
+            accentColor={project.theme.accentColor}
+            mutedColor={project.theme.mutedTextColor}
+            source={resolveSceneSource(project, scene)}
+          />
         </div>
       </WarningSafeArea>
     </AbsoluteFill>
@@ -367,7 +388,11 @@ export function WarningQuoteScene({ project, scene }: WarningSceneProps) {
             maxLines={3}
             text={scene.text.quoteAuthor}
           />
-          <WarningSourceBadge source={scene.text.source} />
+          <WarningSourceBadge
+            accentColor={project.theme.accentColor}
+            mutedColor={project.theme.mutedTextColor}
+            source={resolveSceneSource(project, scene)}
+          />
         </div>
       </WarningSafeArea>
     </AbsoluteFill>
