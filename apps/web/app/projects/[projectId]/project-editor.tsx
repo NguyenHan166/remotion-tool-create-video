@@ -12,6 +12,7 @@ import {
   getResponsivePlayerMaxWidth,
   type ProjectDto,
 } from '../../../src/projects/client';
+import { setProjectVoiceover } from '../../../src/projects/audio';
 import {
   addScene,
   createSceneEditorDraftState,
@@ -38,6 +39,7 @@ import { RenderQueue } from './render-queue';
 import { SceneInspector } from './scene-inspector';
 import { SceneList } from './scene-list';
 import { SceneStripControls } from './scene-strip-controls';
+import { VoiceoverEditor } from './voiceover-editor';
 
 function projectErrorMessage(error: unknown): string {
   if (error instanceof ProjectApiError) {
@@ -364,6 +366,18 @@ function LoadedProjectEditor({
                   ...current.document,
                   captions,
                 },
+              }));
+            }}
+          />
+
+          <VoiceoverEditor
+            fps={draft.composition.fps}
+            projectArchived={project.status === 'ARCHIVED'}
+            voiceover={draft.audio.voiceover}
+            onChange={(voiceover) => {
+              updateEditor((current) => ({
+                ...current,
+                document: setProjectVoiceover(current.document, voiceover),
               }));
             }}
           />

@@ -169,6 +169,22 @@ test.describe('project editor preview', () => {
               createdAt: '2026-07-29T00:00:00.000Z',
               updatedAt: '2026-07-29T00:00:00.000Z',
             },
+            {
+              id: '99999999-9999-4999-8999-999999999999',
+              kind: 'AUDIO',
+              status: 'READY',
+              originalName: 'voiceover.wav',
+              mimeType: 'audio/wav',
+              sizeBytes: 2_048,
+              width: null,
+              height: null,
+              durationMs: 12_000,
+              hasAudio: true,
+              errorCode: null,
+              errorMessage: null,
+              createdAt: '2026-07-29T00:00:00.000Z',
+              updatedAt: '2026-07-29T00:00:00.000Z',
+            },
           ],
           page: 1,
           pageSize: 100,
@@ -242,6 +258,28 @@ test.describe('project editor preview', () => {
     await page.waitForTimeout(1_000);
     expect(autosaveRequests).toHaveLength(settledRequestCount);
     expect(renderRequests).toEqual([]);
+  });
+
+  test('selects a voiceover with volume and start offset for the shared preview draft', async ({
+    page,
+  }) => {
+    const autosaveRequests = await mockAutosavingProject(
+      page,
+      createProjectPayload('Voiceover Project'),
+    );
+
+    await page.goto(`/projects/${projectId}`);
+    await page.getByLabel('Tệp lời đọc').selectOption('99999999-9999-4999-8999-999999999999');
+    await page.getByLabel('Âm lượng lời đọc').press('ArrowLeft');
+    await page.getByLabel('Bắt đầu lời đọc (frame)').fill('24');
+
+    await expect(page.getByTestId('autosave-status')).toHaveAttribute('data-phase', 'saved');
+    expect(autosaveRequests).toHaveLength(1);
+    expect(autosaveRequests[0]?.document.audio.voiceover).toEqual({
+      assetId: '99999999-9999-4999-8999-999999999999',
+      startAtFrame: 24,
+      volume: 0.95,
+    });
   });
 
   test('seeks exact scene boundaries and keeps the active strip item in sync', async ({ page }) => {

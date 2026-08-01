@@ -7,7 +7,11 @@ import { NewsCleanV1Template } from './Template.js';
 
 registerTemplateRenderer(NEWS_CLEAN_V1_ID, NewsCleanV1Template);
 
-export { InvalidTemplateProjectError, MissingTemplateAssetError } from './errors.js';
+export {
+  InvalidTemplateProjectError,
+  MissingTemplateAssetError,
+  MissingVoiceoverAssetError,
+} from './errors.js';
 export {
   CaptionLayer,
   getActiveCaptionEntry,
@@ -18,6 +22,11 @@ export {
   type CaptionWord,
 } from './CaptionLayer.js';
 export { NewsCleanV1Template } from './Template.js';
+export {
+  getVoiceoverLayerConfig,
+  VoiceoverLayer,
+  type VoiceoverLayerConfig,
+} from './VoiceoverLayer.js';
 export {
   NEWS_CLEAN_V1_ID,
   NEWS_CLEAN_V1_SCENE_TYPES,

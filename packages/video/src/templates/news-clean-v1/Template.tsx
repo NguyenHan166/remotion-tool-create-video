@@ -5,6 +5,7 @@ import { CaptionLayer } from './CaptionLayer.js';
 import { SceneRenderer } from './SceneRenderer.js';
 import { SharedLayers } from './components.js';
 import { NEWS_CLEAN_COLORS, NEWS_CLEAN_FONT_FAMILY } from './tokens.js';
+import { VoiceoverLayer } from './VoiceoverLayer.js';
 
 export function NewsCleanV1Template({ project, assets }: TemplateComponentProps) {
   const validation = validateNewsCleanV1(project);
@@ -36,6 +37,7 @@ export function NewsCleanV1Template({ project, assets }: TemplateComponentProps)
       </Series>
       <SharedLayers assets={assets} durationInFrames={durationInFrames} project={project} />
       <CaptionLayer project={project} />
+      <VoiceoverLayer assets={assets} project={project} />
     </AbsoluteFill>
   );
 }

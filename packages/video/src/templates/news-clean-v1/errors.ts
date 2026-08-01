@@ -11,6 +11,17 @@ export class MissingTemplateAssetError extends Error {
   }
 }
 
+export class MissingVoiceoverAssetError extends Error {
+  readonly code = 'TEMPLATE_ASSET_MISSING';
+  readonly assetId: string;
+
+  constructor(assetId: string) {
+    super(`Voiceover asset "${assetId}" is missing.`);
+    this.name = 'MissingVoiceoverAssetError';
+    this.assetId = assetId;
+  }
+}
+
 export class InvalidTemplateProjectError extends Error {
   readonly code = 'TEMPLATE_PROJECT_INVALID';
   readonly issues: readonly { code: string; path: string; message: string }[];
