@@ -37,6 +37,16 @@ export {
   type SelectedRenderComposition,
 } from './render-composition.js';
 export {
+  parseRenderedVideoProbe,
+  probeRenderedVideo,
+  renderThumbnail,
+  runFfprobe,
+  type FfprobeRunner,
+  type RenderedThumbnail,
+  type RenderedVideoProbe,
+  type RenderStill,
+} from './render-finalization.js';
+export {
   WorkerDoctorError,
   assertWorkerDoctorHealthy,
   checkCommandAvailable,

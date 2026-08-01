@@ -110,6 +110,10 @@ class EnqueueTestRepository implements RenderJobRepository {
     throw new Error('Not implemented by enqueue test repository.');
   }
 
+  async complete(): Promise<RenderJobRecord> {
+    throw new Error('Not implemented by enqueue test repository.');
+  }
+
   async retry(): Promise<RenderJobRecord> {
     throw new Error('Not implemented by enqueue test repository.');
   }

@@ -14,9 +14,12 @@ import {
   STORAGE_DIRECTORY_NAMES,
   StoragePathError,
   createRenderJobAttemptPaths,
+  createRenderJobOutputPaths,
+  finalizeRenderJobAttempt,
   initializeRenderJobAttempt,
   initializeStorage,
   removeRenderJobTempDirectory,
+  removeRenderJobOutputs,
   safeJoin,
   type StorageInitializationError,
 } from '../packages/storage/src/index.js';
@@ -120,9 +123,31 @@ describe('render attempt cleanup', () => {
     expect(attemptPaths).toEqual({
       directory: expectedDirectory,
       video: staleOutput,
+      thumbnail: join(expectedDirectory, 'thumbnail.jpg'),
     });
     expect(statSync(attemptPaths.directory).isDirectory()).toBe(true);
     expect(existsSync(staleOutput)).toBe(false);
+  });
+
+  it('atomically promotes video and thumbnail into their final locations', async () => {
+    const parent = createTemporaryDirectory();
+    const paths = await initializeStorage(join(parent, 'data'));
+    const renderJobId = '11111111-1111-4111-8111-111111111111';
+    const attempt = await initializeRenderJobAttempt(paths, renderJobId);
+    writeFileSync(attempt.video, 'video');
+    writeFileSync(attempt.thumbnail, 'thumbnail');
+
+    const outputs = await finalizeRenderJobAttempt(paths, renderJobId);
+
+    expect(outputs).toEqual(createRenderJobOutputPaths(paths, renderJobId));
+    expect(existsSync(outputs.video)).toBe(true);
+    expect(existsSync(outputs.thumbnail)).toBe(true);
+    expect(existsSync(attempt.video)).toBe(false);
+    expect(existsSync(attempt.thumbnail)).toBe(false);
+
+    await removeRenderJobOutputs(paths, renderJobId);
+    expect(existsSync(outputs.directory)).toBe(false);
+    expect(existsSync(outputs.thumbnail)).toBe(false);
   });
 
   it('rejects unsafe attempt paths before touching storage', async () => {

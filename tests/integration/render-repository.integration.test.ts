@@ -5,6 +5,7 @@ import {
   PrismaRenderJobRepository,
   PrismaRenderOutputRepository,
   PrismaRenderRevisionRepository,
+  RenderJobCompletionRejectedError,
   RenderJobProgressRejectedError,
   createPrismaClient,
   type PrismaClient,
@@ -771,6 +772,91 @@ integrationTest('Prisma render repositories integration', () => {
       workerId: 'worker-a',
       stageMessage: 'Encoding H.264 media.',
     });
+  });
+
+  it('creates final outputs and completes the owning job in one transaction', async () => {
+    const projectId = randomUUID();
+    const revisionId = randomUUID();
+    const renderJobId = randomUUID();
+    createdProjectIds.push(projectId);
+
+    await database.project.create({
+      data: {
+        id: projectId,
+        name: 'Atomic render completion',
+        draftDocument: {},
+        revisions: {
+          create: {
+            id: revisionId,
+            revisionNumber: 1,
+            schemaVersion: 1,
+            templateId: 'news-clean-v1',
+            templateVersion: 1,
+            contentHash: '9'.repeat(64),
+            document: {},
+          },
+        },
+        renderJobs: {
+          create: {
+            id: renderJobId,
+            revisionId,
+            preset: 'vertical-h264',
+            status: 'ENCODING',
+            progress: 0.995,
+            workerId: 'finalizer',
+          },
+        },
+      },
+    });
+
+    const repository = new PrismaRenderJobRepository(database);
+    const outputs = [
+      {
+        kind: 'VIDEO' as const,
+        relativePath: `renders/${renderJobId}/video.mp4`,
+        fileName: 'video.mp4',
+        mimeType: 'video/mp4',
+        sizeBytes: 2048n,
+        width: 1080,
+        height: 1920,
+        durationMs: 10_000n,
+        metadata: { videoCodec: 'h264' },
+      },
+      {
+        kind: 'THUMBNAIL' as const,
+        relativePath: `thumbnails/${renderJobId}.jpg`,
+        fileName: 'thumbnail.jpg',
+        mimeType: 'image/jpeg',
+        sizeBytes: 512n,
+        width: 1080,
+        height: 1920,
+        metadata: { frame: 149 },
+      },
+    ];
+
+    await expect(
+      repository.complete({ renderJobId, workerId: 'wrong-worker', outputs }),
+    ).rejects.toBeInstanceOf(RenderJobCompletionRejectedError);
+    await expect(database.renderOutput.count({ where: { renderJobId } })).resolves.toBe(0);
+
+    const completed = await repository.complete({
+      renderJobId,
+      workerId: 'finalizer',
+      outputs,
+    });
+
+    expect(completed).toMatchObject({
+      status: 'COMPLETED',
+      progress: 1,
+      stageMessage: 'Render completed.',
+      finishedAt: expect.any(Date),
+    });
+    expect(completed.outputs).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ kind: 'VIDEO', sizeBytes: 2048n }),
+        expect.objectContaining({ kind: 'THUMBNAIL', sizeBytes: 512n }),
+      ]),
+    );
   });
 
   it('recovers stale jobs across a worker restart and preserves fresh work', async () => {

@@ -10,13 +10,15 @@ import {
 } from '@hansys/database';
 import {
   assertStorageWritable,
+  finalizeRenderJobAttempt,
   initializeRenderJobAttempt,
+  removeRenderJobOutputs,
   removeRenderJobTempDirectory,
   resolveStoredAssetPath,
 } from '@hansys/storage';
 import { overrideVideoWebpackConfig } from '@hansys/video/bundler-config';
 import { bundle } from '@remotion/bundler';
-import { makeCancelSignal, renderMedia, selectComposition } from '@remotion/renderer';
+import { makeCancelSignal, renderMedia, renderStill, selectComposition } from '@remotion/renderer';
 import { WorkerAssetServer } from './asset-server.js';
 import { PersistentRemotionBundleCache, computeRemotionBundleKey } from './bundle-cache.js';
 import { database } from './database.js';
@@ -32,6 +34,7 @@ import { selectCompositionFromRevision } from './render-composition.js';
 import { RenderPipelineError, classifyRenderFailure } from './render-errors.js';
 import { persistRenderFailure } from './render-failure-runtime.js';
 import { renderH264Media } from './render-media.js';
+import { probeRenderedVideo, renderThumbnail } from './render-finalization.js';
 import { storagePaths } from './storage.js';
 
 const require = createRequire(import.meta.url);
@@ -117,6 +120,7 @@ export const workerLifecycle = new WorkerLifecycle({
       externalSignal: signal,
     });
     let prepared: Awaited<ReturnType<typeof selectCompositionFromRevision>> | undefined;
+    let completed = false;
 
     const outcome = await runRenderAttemptWithCancellation({
       monitor: cancellationMonitor,
@@ -223,13 +227,101 @@ export const workerLifecycle = new WorkerLifecycle({
             }),
         });
         console.info(`Rendered H.264 media for render job ${job.id} to ${attemptPaths.video}.`);
-        throw new Error('Render finalization pipeline is not available yet.');
+
+        await cancellationMonitor.check();
+        await renderJobRepository.updateProgress({
+          renderJobId: job.id,
+          workerId,
+          status: 'ENCODING',
+          progress: 0.98,
+          stageMessage: 'Verifying rendered media.',
+        });
+        const video = await probeRenderedVideo(attemptPaths.video, prepared.composition);
+
+        await cancellationMonitor.check();
+        await renderJobRepository.updateProgress({
+          renderJobId: job.id,
+          workerId,
+          status: 'ENCODING',
+          progress: 0.99,
+          stageMessage: 'Rendering thumbnail.',
+        });
+        const thumbnail = await renderThumbnail({
+          outputLocation: attemptPaths.thumbnail,
+          serveUrl: prepared.serveUrl,
+          composition: prepared.composition,
+          inputProps: prepared.inputProps,
+          cancelSignal: remotionCancellation.cancelSignal,
+          render: renderStill,
+        });
+
+        await cancellationMonitor.check();
+        await renderJobRepository.updateProgress({
+          renderJobId: job.id,
+          workerId,
+          status: 'ENCODING',
+          progress: 0.995,
+          stageMessage: 'Finalizing render outputs.',
+        });
+        const outputPaths = await finalizeRenderJobAttempt(storagePaths, job.id);
+
+        try {
+          await renderJobRepository.complete({
+            renderJobId: job.id,
+            workerId,
+            outputs: [
+              {
+                kind: 'VIDEO',
+                relativePath: outputPaths.videoRelativePath,
+                fileName: prepared.inputProps.project.export.fileName ?? 'video.mp4',
+                mimeType: 'video/mp4',
+                sizeBytes: video.sizeBytes,
+                width: video.width,
+                height: video.height,
+                durationMs: video.durationMs,
+                metadata: video.metadata,
+              },
+              {
+                kind: 'THUMBNAIL',
+                relativePath: outputPaths.thumbnailRelativePath,
+                fileName: 'thumbnail.jpg',
+                mimeType: 'image/jpeg',
+                sizeBytes: thumbnail.sizeBytes,
+                width: thumbnail.width,
+                height: thumbnail.height,
+                metadata: { frame: thumbnail.frame },
+              },
+            ],
+          });
+          completed = true;
+        } catch (error) {
+          await removeRenderJobOutputs(storagePaths, job.id);
+          throw error;
+        }
+
+        console.info(`Finalized video and thumbnail outputs for render job ${job.id}.`);
       },
       cleanup: async () => {
+        let cleanupError: unknown;
+
         try {
           await prepared?.close();
-        } finally {
+        } catch (error) {
+          cleanupError = error;
+        }
+
+        try {
           await removeRenderJobTempDirectory(storagePaths, job.id);
+        } catch (error) {
+          cleanupError ??= error;
+        }
+
+        if (cleanupError !== undefined) {
+          if (!completed) {
+            throw cleanupError;
+          }
+
+          console.warn(`Could not fully clean up completed render job ${job.id}.`, cleanupError);
         }
       },
       completeCancellation: async () => {

@@ -1,5 +1,5 @@
 import { constants } from 'node:fs';
-import { access, mkdir, open, rm, unlink } from 'node:fs/promises';
+import { access, mkdir, open, rename, rm, unlink } from 'node:fs/promises';
 import { isAbsolute, relative, resolve, sep, win32 } from 'node:path';
 import { randomUUID } from 'node:crypto';
 
@@ -22,6 +22,15 @@ export type AssetStorageLocation = Readonly<{
 export type RenderJobAttemptPaths = Readonly<{
   directory: string;
   video: string;
+  thumbnail: string;
+}>;
+
+export type RenderJobOutputPaths = Readonly<{
+  directory: string;
+  video: string;
+  thumbnail: string;
+  videoRelativePath: string;
+  thumbnailRelativePath: string;
 }>;
 
 export type StoragePaths = Readonly<
@@ -240,7 +249,56 @@ export function createRenderJobAttemptPaths(
   return Object.freeze({
     directory,
     video: safeJoin(directory, 'video.mp4'),
+    thumbnail: safeJoin(directory, 'thumbnail.jpg'),
   });
+}
+
+export function createRenderJobOutputPaths(
+  paths: StoragePaths,
+  renderJobId: string,
+): RenderJobOutputPaths {
+  const normalizedRenderJobId = normalizeRenderJobId(renderJobId);
+  const directory = safeJoin(paths.renders, normalizedRenderJobId);
+
+  return Object.freeze({
+    directory,
+    video: safeJoin(directory, 'video.mp4'),
+    thumbnail: safeJoin(paths.thumbnails, `${normalizedRenderJobId}.jpg`),
+    videoRelativePath: `${STORAGE_DIRECTORY_NAMES.renders}/${normalizedRenderJobId}/video.mp4`,
+    thumbnailRelativePath: `${STORAGE_DIRECTORY_NAMES.thumbnails}/${normalizedRenderJobId}.jpg`,
+  });
+}
+
+export async function removeRenderJobOutputs(
+  paths: StoragePaths,
+  renderJobId: string,
+): Promise<void> {
+  const outputPaths = createRenderJobOutputPaths(paths, renderJobId);
+
+  await Promise.all([
+    rm(outputPaths.directory, { force: true, recursive: true }),
+    rm(outputPaths.thumbnail, { force: true }),
+  ]);
+}
+
+export async function finalizeRenderJobAttempt(
+  paths: StoragePaths,
+  renderJobId: string,
+): Promise<RenderJobOutputPaths> {
+  const attemptPaths = createRenderJobAttemptPaths(paths, renderJobId);
+  const outputPaths = createRenderJobOutputPaths(paths, renderJobId);
+
+  await mkdir(outputPaths.directory);
+
+  try {
+    await rename(attemptPaths.video, outputPaths.video);
+    await rename(attemptPaths.thumbnail, outputPaths.thumbnail);
+  } catch (error) {
+    await removeRenderJobOutputs(paths, renderJobId);
+    throw error;
+  }
+
+  return outputPaths;
 }
 
 export async function initializeRenderJobAttempt(

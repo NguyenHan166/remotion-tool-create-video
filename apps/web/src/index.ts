@@ -62,10 +62,19 @@ export {
 export {
   createRenderCollectionHandlers,
   createRenderCancellationHandlers,
+  createRenderOutputFileHandlers,
   createRenderResourceHandlers,
   createRenderRetryHandlers,
   type RenderResourceRouteContext,
 } from './renders/handlers.js';
+export {
+  DefaultRenderOutputFileService,
+  RenderOutputFileNotFoundError,
+  RenderOutputNotReadyError,
+  type RenderOutputFileKind,
+  type RenderOutputFileService,
+  type RenderOutputFileStreamResponse,
+} from './renders/file-service.js';
 export {
   DefaultRenderService,
   RenderRecordNotFoundError,

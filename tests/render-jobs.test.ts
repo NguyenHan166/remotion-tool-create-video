@@ -165,6 +165,10 @@ class MemoryRenderJobRepository implements RenderJobRepository {
     throw new Error('Not implemented by this API test repository.');
   }
 
+  async complete(): Promise<RenderJobRecord> {
+    throw new Error('Not implemented by this API test repository.');
+  }
+
   async retry(id: string): Promise<RenderJobRecord> {
     const job = await this.findById(id);
 

@@ -2,7 +2,7 @@ import { createReadStream } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import { Readable } from 'node:stream';
 import { resolveStoredAssetPath } from './media-upload.js';
-import { type StoragePaths } from './storage.js';
+import { safeJoin, type StoragePaths } from './storage.js';
 
 export type ByteRange = Readonly<{
   start: number;
@@ -97,16 +97,14 @@ export function parseByteRangeHeader(rangeHeader: string, fileSize: number): Byt
   };
 }
 
-export async function createStoredAssetStream(
-  paths: StoragePaths,
-  relativePath: string,
+async function createFileStream(
+  filePath: string,
   rangeHeader?: string,
 ): Promise<StoredAssetStream> {
-  const assetPath = resolveStoredAssetPath(paths, relativePath);
   let fileStat: Awaited<ReturnType<typeof stat>>;
 
   try {
-    fileStat = await stat(assetPath);
+    fileStat = await stat(filePath);
   } catch (error) {
     if (isMissingFileError(error)) {
       throw new StoredAssetFileNotFoundError(error);
@@ -126,8 +124,8 @@ export async function createStoredAssetStream(
   const range = rangeHeader === undefined ? null : parseByteRangeHeader(rangeHeader, fileStat.size);
   const nodeStream =
     range === null
-      ? createReadStream(assetPath)
-      : createReadStream(assetPath, {
+      ? createReadStream(filePath)
+      : createReadStream(filePath, {
           start: range.start,
           end: range.end,
         });
@@ -137,4 +135,20 @@ export async function createStoredAssetStream(
     fileSize: fileStat.size,
     range,
   };
+}
+
+export function createStoredAssetStream(
+  paths: StoragePaths,
+  relativePath: string,
+  rangeHeader?: string,
+): Promise<StoredAssetStream> {
+  return createFileStream(resolveStoredAssetPath(paths, relativePath), rangeHeader);
+}
+
+export function createStoredFileStream(
+  paths: StoragePaths,
+  relativePath: string,
+  rangeHeader?: string,
+): Promise<StoredAssetStream> {
+  return createFileStream(safeJoin(paths.root, relativePath), rangeHeader);
 }

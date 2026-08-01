@@ -7,6 +7,7 @@ import {
   RenderAssetNotReadyError,
 } from '@hansys/database';
 import { ProjectDocumentValidationError } from '@hansys/project-schema';
+import { InvalidByteRangeError } from '@hansys/storage';
 import { TemplateNotFoundError, TemplateVersionMismatchError } from '@hansys/template-registry';
 import { type ZodError, type ZodIssue } from 'zod';
 import { createRenderRequestSchema, listRendersQuerySchema, renderIdSchema } from './contracts.js';
@@ -15,6 +16,12 @@ import {
   RenderTemplateValidationError,
   type RenderService,
 } from './service.js';
+import {
+  RenderOutputFileNotFoundError,
+  RenderOutputNotReadyError,
+  type RenderOutputFileKind,
+  type RenderOutputFileService,
+} from './file-service.js';
 
 type ErrorDetail = {
   path: string;
@@ -294,6 +301,65 @@ export function createRenderRetryHandlers(service: RenderService): {
         return Response.json(await service.retry(renderIdResult.data));
       } catch (error) {
         return handleRenderServiceError(request, error);
+      }
+    },
+  };
+}
+
+export function createRenderOutputFileHandlers(
+  service: RenderOutputFileService,
+  kind: RenderOutputFileKind,
+): {
+  GET: (request: Request, context: RenderResourceRouteContext) => Promise<Response>;
+} {
+  return {
+    GET: async (request, context) => {
+      const { renderId } = await context.params;
+      const renderIdResult = renderIdSchema.safeParse(renderId);
+
+      if (!renderIdResult.success) {
+        return createErrorResponse(
+          request,
+          400,
+          'BAD_REQUEST',
+          'Render ID is invalid.',
+          formatZodIssues(renderIdResult.error),
+        );
+      }
+
+      try {
+        const result = await service.stream(
+          renderIdResult.data,
+          kind,
+          request.headers.get('range') ?? undefined,
+        );
+
+        return new Response(result.body, {
+          status: result.status,
+          headers: result.headers,
+        });
+      } catch (error) {
+        if (error instanceof InvalidByteRangeError) {
+          const response = createErrorResponse(
+            request,
+            416,
+            'BAD_REQUEST',
+            'Requested byte range is not satisfiable.',
+          );
+          response.headers.set('Accept-Ranges', 'bytes');
+          response.headers.set('Content-Range', `bytes */${error.fileSize}`);
+          return response;
+        }
+
+        if (error instanceof RenderOutputFileNotFoundError) {
+          return createErrorResponse(request, 404, error.code, 'Render output not found.');
+        }
+
+        if (error instanceof RenderOutputNotReadyError) {
+          return createErrorResponse(request, 409, error.code, 'Render output is not ready.');
+        }
+
+        return createErrorResponse(request, 500, 'INTERNAL_ERROR', 'An unexpected error occurred.');
       }
     },
   };

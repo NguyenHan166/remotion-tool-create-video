@@ -107,6 +107,11 @@ export type CreateRenderOutputInput = {
   metadata?: Prisma.InputJsonValue;
 };
 
+export type CompleteRenderJobInput = RenderCancellationCheckInput & {
+  outputs: readonly Omit<CreateRenderOutputInput, 'renderJobId'>[];
+  completedAt?: Date;
+};
+
 const renderStatusTransitions = {
   QUEUED: ['PREPARING', 'CANCEL_REQUESTED'],
   PREPARING: ['BUNDLING', 'FAILED', 'CANCEL_REQUESTED'],
@@ -189,6 +194,17 @@ export class RenderJobFailureRejectedError extends Error {
   }
 }
 
+export class RenderJobCompletionRejectedError extends Error {
+  readonly code = 'RENDER_COMPLETION_REJECTED';
+  readonly renderJobId: string;
+
+  constructor(renderJobId: string) {
+    super('Render completion was rejected because the job owner or state changed.');
+    this.name = 'RenderJobCompletionRejectedError';
+    this.renderJobId = renderJobId;
+  }
+}
+
 export class ProjectNotRenderableError extends Error {
   readonly code = 'RENDER_INVALID_STATE';
   readonly projectId: string;
@@ -255,6 +271,7 @@ export interface RenderJobRepository {
   isCancellationRequested(input: RenderCancellationCheckInput): Promise<boolean>;
   completeCancellation(input: CompleteRenderCancellationInput): Promise<RenderJobRecord>;
   recordFailure(input: RecordRenderFailureInput): Promise<RenderFailureDisposition>;
+  complete(input: CompleteRenderJobInput): Promise<RenderJobRecord>;
   retry(renderJobId: string): Promise<RenderJobRecord>;
   updateProgress(input: UpdateRenderJobProgressInput): Promise<void>;
   findById(renderJobId: string): Promise<RenderJobRecord | null>;
@@ -531,6 +548,84 @@ export class PrismaRenderJobRepository implements RenderJobRepository {
         id: renderJobId,
       },
       include: renderJobWithOutputs,
+    });
+  }
+
+  async complete({
+    renderJobId,
+    workerId,
+    outputs,
+    completedAt = new Date(),
+  }: CompleteRenderJobInput): Promise<RenderJobRecord> {
+    assertRenderWorkerId(workerId);
+
+    if (Number.isNaN(completedAt.getTime())) {
+      throw new RangeError('Render completion timestamp must be a valid date.');
+    }
+
+    if (outputs.length === 0) {
+      throw new RangeError('A completed render must contain at least one output.');
+    }
+
+    return this.#database.$transaction(async (transaction) => {
+      const jobs = await transaction.$queryRaw<
+        Array<{ status: RenderStatus; workerId: string | null }>
+      >(
+        Prisma.sql`
+          SELECT status, "workerId"
+          FROM "RenderJob"
+          WHERE id = ${renderJobId}::uuid
+          FOR UPDATE
+        `,
+      );
+      const job = jobs[0];
+
+      if (job === undefined) {
+        throw new RenderJobNotFoundError(renderJobId);
+      }
+
+      if (job.status !== 'ENCODING' || job.workerId !== workerId) {
+        throw new RenderJobCompletionRejectedError(renderJobId);
+      }
+
+      await transaction.renderJob.update({
+        where: { id: renderJobId },
+        data: {
+          progress: 1,
+          stageMessage: 'Finalizing render outputs.',
+          heartbeatAt: completedAt,
+        },
+      });
+
+      await transaction.renderOutput.createMany({
+        data: outputs.map((output) => ({
+          id: output.id ?? randomUUID(),
+          renderJobId,
+          kind: output.kind,
+          relativePath: output.relativePath,
+          fileName: output.fileName,
+          mimeType: output.mimeType,
+          sizeBytes: output.sizeBytes,
+          ...(output.width === undefined ? {} : { width: output.width }),
+          ...(output.height === undefined ? {} : { height: output.height }),
+          ...(output.durationMs === undefined ? {} : { durationMs: output.durationMs }),
+          ...(output.metadata === undefined ? {} : { metadata: output.metadata }),
+        })),
+      });
+
+      return transaction.renderJob.update({
+        where: { id: renderJobId },
+        data: {
+          status: 'COMPLETED',
+          stageMessage: 'Render completed.',
+          heartbeatAt: completedAt,
+          finishedAt: completedAt,
+          errorCode: null,
+          errorMessage: null,
+          technicalError: null,
+        },
+        include: renderJobWithOutputs,
+      });
     });
   }
 
