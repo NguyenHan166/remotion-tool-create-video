@@ -12,3 +12,4 @@ examples/
 schemas/
 README.md
 MANIFEST.json
+next-env.d.ts
