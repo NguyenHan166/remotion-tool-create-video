@@ -42,9 +42,9 @@ RUN pnpm --filter @hansys/database prisma:generate
 
 # Build all packages via Turborepo (Next.js standalone output, etc.)
 # Provide dummy environment variables to satisfy Zod validations during Next.js static analysis
-ENV APP_VERSION=build
-ENV DATABASE_URL=postgresql://dummy:dummy@localhost:5432/dummy
-ENV DATA_DIR=/tmp
+RUN echo "APP_VERSION=build" > apps/web/.env.local && \
+    echo "DATABASE_URL=postgresql://dummy:dummy@localhost:5432/dummy" >> apps/web/.env.local && \
+    echo "DATA_DIR=/tmp" >> apps/web/.env.local
 RUN pnpm turbo run build
 
 # ── Stage 4: runner ──────────────────────────────────────────
