@@ -1,6 +1,7 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import Link from 'next/link';
 import { useDeferredValue, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import {
   AssetApiError,
@@ -271,14 +272,25 @@ export function AssetLibrary() {
     <main className="min-h-screen">
       <header className="border-b border-white/8 bg-[#090c12]/80 backdrop-blur-xl">
         <div className="mx-auto flex max-w-[1560px] items-center justify-between px-5 py-4 sm:px-8">
-          <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-orange-500 font-black text-white shadow-[0_0_32px_rgba(255,90,54,0.25)]">
-              H
+          <div className="flex items-center gap-8">
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-orange-500 font-black text-white shadow-[0_0_32px_rgba(255,90,54,0.25)]">
+                H
+              </div>
+              <div>
+                <p className="text-sm font-semibold tracking-wide text-white">HANSYS STUDIO</p>
+                <p className="text-[11px] text-slate-500">Local video workspace</p>
+              </div>
             </div>
-            <div>
-              <p className="text-sm font-semibold tracking-wide text-white">HANSYS STUDIO</p>
-              <p className="text-[11px] text-slate-500">Local video workspace</p>
-            </div>
+
+            <nav className="hidden md:flex items-center gap-6">
+              <Link href="/projects" className="text-sm font-medium text-slate-400 hover:text-white transition-colors">
+                Dự án
+              </Link>
+              <Link href="/assets" className="text-sm font-semibold text-orange-500">
+                Thư viện media
+              </Link>
+            </nav>
           </div>
           <div className="hidden items-center gap-2 text-xs text-slate-500 sm:flex">
             <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.7)]" />

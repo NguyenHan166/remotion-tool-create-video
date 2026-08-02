@@ -1,7 +1,7 @@
 import { CaptionConfigV1Schema, PROJECT_SCENE_TYPES } from '@hansys/project-schema';
 import { z } from 'zod';
 
-const framesPerSecondSchema = z.literal([24, 25, 30, 50, 60]);
+const framesPerSecondSchema = z.union([z.literal(24), z.literal(25), z.literal(30), z.literal(50), z.literal(60)]);
 
 export const createProjectRequestSchema = z.strictObject({
   name: z.string().trim().min(1).max(200),

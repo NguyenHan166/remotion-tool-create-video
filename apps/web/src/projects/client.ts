@@ -17,6 +17,20 @@ export type ProjectDto = {
   updatedAt: string;
 };
 
+export type ProjectSummaryDto = {
+  id: string;
+  name: string;
+  status: 'DRAFT' | 'ARCHIVED';
+  updatedAt: string;
+};
+
+export type ProjectPageDto = {
+  items: ProjectSummaryDto[];
+  page: number;
+  pageSize: number;
+  total: number;
+};
+
 export type SrtImportWarningDto = {
   code: 'SRT_OVERLAP';
   cueIndex: number;
@@ -70,6 +84,48 @@ async function toApiError(response: Response): Promise<ProjectApiError> {
       ?.map((detail) => detail.message)
       .filter((message): message is string => message !== undefined) ?? [],
   );
+}
+
+export async function listProjects(
+  page: number = 1,
+  pageSize: number = 20,
+  signal?: AbortSignal,
+): Promise<ProjectPageDto> {
+  const params = new URLSearchParams({
+    page: page.toString(),
+    pageSize: pageSize.toString(),
+  });
+  const response = await fetch(`/api/v1/projects?${params.toString()}`, {
+    ...(signal === undefined ? {} : { signal }),
+  });
+
+  if (!response.ok) {
+    throw await toApiError(response);
+  }
+
+  return (await response.json()) as ProjectPageDto;
+}
+
+export async function createProject(
+  name: string,
+  templateId: string,
+  width: number,
+  height: number,
+  fps: number,
+): Promise<ProjectDto> {
+  const response = await fetch(`/api/v1/projects`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ name, templateId, width, height, fps }),
+  });
+
+  if (!response.ok) {
+    throw await toApiError(response);
+  }
+
+  return (await response.json()) as ProjectDto;
 }
 
 export async function fetchProject(projectId: string, signal?: AbortSignal): Promise<ProjectDto> {
