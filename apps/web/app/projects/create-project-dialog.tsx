@@ -22,8 +22,8 @@ export function CreateProjectDialog({ onClose }: { onClose: () => void }) {
       // Defaulting to standard vertical format 1080x1920 30FPS
       const project = await createProject(name, templateId, 1080, 1920, 30);
       router.push(`/projects/${project.id}`);
-    } catch (err: any) {
-      setError(err.message || 'Lỗi khi tạo dự án');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Lỗi khi tạo dự án');
       setIsSubmitting(false);
     }
   };

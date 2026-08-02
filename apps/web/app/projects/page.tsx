@@ -8,7 +8,7 @@ import { CreateProjectDialog } from './create-project-dialog';
 
 export default function ProjectsPage() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [page, setPage] = useState(1);
+  const [page] = useState(1);
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['projects', page],
