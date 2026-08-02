@@ -44,7 +44,8 @@ RUN pnpm --filter @hansys/database prisma:generate
 # Provide dummy environment variables to satisfy Zod validations during Next.js static analysis
 RUN echo "APP_VERSION=build" > apps/web/.env.local && \
     echo "DATABASE_URL=postgresql://dummy:dummy@localhost:5432/dummy" >> apps/web/.env.local && \
-    echo "DATA_DIR=/tmp" >> apps/web/.env.local
+    echo "DATA_DIR=/tmp" >> apps/web/.env.local && \
+    echo "NEXT_PUBLIC_APP_URL=http://localhost:3000" >> apps/web/.env.local
 RUN pnpm turbo run build
 
 # ── Stage 4: runner ──────────────────────────────────────────
