@@ -29,12 +29,15 @@ export default function ProjectsPage() {
                 <p className="text-[11px] text-slate-500">Local video workspace</p>
               </div>
             </div>
-            
+
             <nav className="hidden md:flex items-center gap-6">
               <Link href="/projects" className="text-sm font-semibold text-orange-500">
                 Dự án
               </Link>
-              <Link href="/assets" className="text-sm font-medium text-slate-400 hover:text-white transition-colors">
+              <Link
+                href="/assets"
+                className="text-sm font-medium text-slate-400 hover:text-white transition-colors"
+              >
                 Thư viện media
               </Link>
             </nav>
@@ -65,7 +68,17 @@ export default function ProjectsPage() {
               onClick={() => setIsCreateOpen(true)}
               className="flex items-center gap-2 rounded-xl bg-orange-600 px-6 py-3 text-sm font-semibold text-white shadow-[0_0_24px_rgba(234,88,12,0.4)] transition-all hover:bg-orange-500 hover:shadow-[0_0_32px_rgba(234,88,12,0.6)]"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <line x1="12" y1="5" x2="12" y2="19"></line>
                 <line x1="5" y1="12" x2="19" y2="12"></line>
               </svg>
@@ -104,7 +117,17 @@ export default function ProjectsPage() {
                   <div>
                     <div className="flex items-start justify-between">
                       <div className="flex h-10 w-10 items-center justify-center rounded-full bg-orange-500/10 text-orange-500">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="20"
+                          height="20"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
                           <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect>
                           <line x1="7" y1="2" x2="7" y2="22"></line>
                           <line x1="17" y1="2" x2="17" y2="22"></line>
@@ -123,14 +146,22 @@ export default function ProjectsPage() {
                       {project.name}
                     </h3>
                   </div>
-                  
+
                   <div className="mt-6 flex items-center justify-between border-t border-white/5 pt-4 text-[11px] text-slate-500">
-                    <span>
-                      Cập nhật: {new Date(project.updatedAt).toLocaleDateString('vi-VN')}
-                    </span>
+                    <span>Cập nhật: {new Date(project.updatedAt).toLocaleDateString('vi-VN')}</span>
                     <span className="flex items-center gap-1 group-hover:text-orange-400 transition-colors">
                       Mở Editor
-                      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="12"
+                        height="12"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
                         <line x1="5" y1="12" x2="19" y2="12"></line>
                         <polyline points="12 5 19 12 12 19"></polyline>
                       </svg>

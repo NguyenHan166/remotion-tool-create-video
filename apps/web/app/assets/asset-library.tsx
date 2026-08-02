@@ -284,7 +284,10 @@ export function AssetLibrary() {
             </div>
 
             <nav className="hidden md:flex items-center gap-6">
-              <Link href="/projects" className="text-sm font-medium text-slate-400 hover:text-white transition-colors">
+              <Link
+                href="/projects"
+                className="text-sm font-medium text-slate-400 hover:text-white transition-colors"
+              >
                 Dự án
               </Link>
               <Link href="/assets" className="text-sm font-semibold text-orange-500">
