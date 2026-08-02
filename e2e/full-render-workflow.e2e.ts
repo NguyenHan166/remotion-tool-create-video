@@ -372,9 +372,6 @@ test.describe('full end-to-end render workflow', () => {
     // 11. Verify Download MP4 Video Button links to download endpoint
     const downloadLink = page.getByRole('link', { name: 'Tải video MP4' });
     await expect(downloadLink).toBeVisible();
-    await expect(downloadLink).toHaveAttribute(
-      'href',
-      `/api/v1/renders/${renderId}/download`,
-    );
+    await expect(downloadLink).toHaveAttribute('href', `/api/v1/renders/${renderId}/download`);
   });
 });

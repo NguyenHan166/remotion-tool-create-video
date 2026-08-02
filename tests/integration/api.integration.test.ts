@@ -240,9 +240,12 @@ integrationTest('API Integration Suite against PostgreSQL', () => {
       expect(staleError.error.code).toBe('PROJECT_VERSION_CONFLICT');
 
       // 6. Duplicate project via POST /api/v1/projects/:id/duplicate
-      const dupReq = new Request(`http://localhost/api/v1/projects/${createdProject.id}/duplicate`, {
-        method: 'POST',
-      });
+      const dupReq = new Request(
+        `http://localhost/api/v1/projects/${createdProject.id}/duplicate`,
+        {
+          method: 'POST',
+        },
+      );
       const dupRes = await projectDuplicateHandlers.POST(dupReq, {
         params: Promise.resolve({ projectId: createdProject.id }),
       });
@@ -300,17 +303,14 @@ integrationTest('API Integration Suite against PostgreSQL', () => {
       expect(previewData.scenes.length).toBe(2);
 
       // 2. Script apply via POST /api/v1/projects/:id/script-apply
-      const applyReq = new Request(
-        `http://localhost/api/v1/projects/${project.id}/script-apply`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            expectedDraftVersion: 1,
-            scenes: previewData.scenes,
-          }),
-        },
-      );
+      const applyReq = new Request(`http://localhost/api/v1/projects/${project.id}/script-apply`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          expectedDraftVersion: 1,
+          scenes: previewData.scenes,
+        }),
+      });
       const applyRes = await projectScriptApplyHandlers.POST(applyReq, {
         params: Promise.resolve({ projectId: project.id }),
       });
@@ -320,14 +320,11 @@ integrationTest('API Integration Suite against PostgreSQL', () => {
       expect(appliedProject.document.scenes.length).toBe(2);
 
       // 3. Create manual revision via POST /api/v1/projects/:id/revisions
-      const createRevReq = new Request(
-        `http://localhost/api/v1/projects/${project.id}/revisions`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ label: 'Manual Snapshot v1' }),
-        },
-      );
+      const createRevReq = new Request(`http://localhost/api/v1/projects/${project.id}/revisions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ label: 'Manual Snapshot v1' }),
+      });
       const createRevRes = await projectRevisionHandlers.POST(createRevReq, {
         params: Promise.resolve({ projectId: project.id }),
       });
@@ -337,9 +334,7 @@ integrationTest('API Integration Suite against PostgreSQL', () => {
       expect(createdRev.label).toBe('Manual Snapshot v1');
 
       // 4. List revisions via GET /api/v1/projects/:id/revisions
-      const listRevReq = new Request(
-        `http://localhost/api/v1/projects/${project.id}/revisions`,
-      );
+      const listRevReq = new Request(`http://localhost/api/v1/projects/${project.id}/revisions`);
       const listRevRes = await projectRevisionHandlers.GET(listRevReq, {
         params: Promise.resolve({ projectId: project.id }),
       });
@@ -358,10 +353,7 @@ integrationTest('API Integration Suite against PostgreSQL', () => {
         'base64',
       );
       const formData = new FormData();
-      formData.append(
-        'file',
-        new File([pngBuffer], 'test-image.png', { type: 'image/png' }),
-      );
+      formData.append('file', new File([pngBuffer], 'test-image.png', { type: 'image/png' }));
 
       const uploadReq = new Request('http://localhost/api/v1/assets', {
         method: 'POST',
