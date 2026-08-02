@@ -1,0 +1,56 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build artifacts
+.next/
+dist/
+packages/video/build/
+packages/database/generated/
+.turbo/
+.build-data/
+.tmp-build-data/
+*.tsbuildinfo
+
+# Version control
+.git/
+.gitattributes
+
+# Test artifacts
+coverage/
+playwright-report/
+test-results/
+tests/
+e2e/
+
+# IDE and editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Environment and secrets
+.env
+.env.local
+.env.*.local
+
+# Documentation (not needed in image)
+docs/
+
+# Docker files (avoid recursive copy)
+docker/
+
+# Agents and tooling config
+.agents/
+.kombai/
+.antigravityignore
+
+# Logs
+*.log
+
+# Examples directory
+examples/

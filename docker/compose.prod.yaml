@@ -28,7 +28,7 @@ services:
 
   web:
     image: ${APP_IMAGE}:${APP_VERSION}
-    command: ["pnpm", "--filter", "@hansys/web", "start"]
+    # Command is omitted to use the default CMD from Dockerfile: ["node", "apps/web/server.js"]
     restart: unless-stopped
     environment:
       NODE_ENV: production
